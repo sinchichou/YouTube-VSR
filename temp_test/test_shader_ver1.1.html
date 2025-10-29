@@ -1,0 +1,120 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <meta charset="UTF-8">
+    <title>WebGL Shader Test</title>
+    <style>
+      body { margin: 0; overflow: hidden; background-color: #333; font-family: sans-serif; }
+      canvas { display: block; width: 100vw; height: 100vh; }
+      #controls { position: absolute; top: 10px; left: 10px; background: rgba(0,0,0,0.7); color: white; padding: 15px; border-radius: 5px; width: 320px; }
+      .control-group { margin-bottom: 12px; }
+      .control-group label { display: block; margin-bottom: 5px; font-weight: bold; }
+      .control-group input { width: 100%; }
+      .control-group span { float: right; font-weight: normal; }
+    </style>
+</head>
+<body>
+    <canvas id="canvas"></canvas>
+
+    <div id="controls">
+      <div class="control-group">
+        <label>Pass 1: 影像修復</label>
+      </div>
+      <div class="control-group">
+        <label for="repairRadius">採樣半徑 <span id="repairRadiusVal">1.0</span></label>
+        <input type="range" id="repairRadius" min="1" max="3" step="1" value="1">
+      </div>
+      <div class="control-group">
+        <label for="repairStrength">修復強度 <span id="repairStrengthVal">1.00</span></label>
+        <input type="range" id="repairStrength" min="0" max="1" step="0.01" value="1.0">
+      </div>
+      <div class="control-group">
+        <label for="edgeSensitivity">邊緣敏感度 <span id="edgeSensitivityVal">0.08</span></label>
+        <input type="range" id="edgeSensitivity" min="0.01" max="0.5" step="0.01" value="0.08">
+      </div>
+      <hr>
+      <div class="control-group">
+        <label>Pass 2: CAS 智慧銳化</label>
+      </div>
+      <div class="control-group">
+        <label for="casSharpness">銳化強度 <span id="casSharpnessVal">0.50</span></label>
+        <input type="range" id="casSharpness" min="0" max="1" step="0.01" value="0.5">
+      </div>
+    </div>
+
+    <script src="https://twgljs.org/dist/4.x/twgl-full.min.js"></script>
+    <script>
+    async function main() {
+      const canvas = document.getElementById("canvas");
+      const gl = twgl.getWebGLContext(canvas);
+      if (!gl) return alert("WebGL not supported");
+
+      const shaderSources = await Promise.all([
+        fetch('../GLSL/vertex.glsl').then(res => res.text()),
+        fetch('../GLSL/deblock.fs.glsl').then(res => res.text()),
+        fetch('../GLSL/sharpen_denoise.fs.glsl').then(res => res.text()),
+      ]);
+      const [vs, fs_repair, fs_sharpen] = shaderSources;
+
+      const repairProgram = twgl.createProgramInfo(gl, [vs, fs_repair]);
+      const sharpenProgram = twgl.createProgramInfo(gl, [vs, fs_sharpen]);
+
+      if (!repairProgram || !sharpenProgram) return console.error("Shader compilation failed.");
+
+      const arrays = { position: [-1, -1, 0, 1, -1, 0, -1, 1, 0, -1, 1, 0, 1, -1, 0, 1, 1, 0] };
+      const quad = twgl.createBufferInfoFromArrays(gl, arrays);
+
+      const texture = twgl.createTexture(gl, {
+          src: "test.png", crossOrigin: '', flipY: true, min: gl.LINEAR, mag: gl.LINEAR, wrap: gl.CLAMP_TO_EDGE,
+      });
+
+      const fboA = twgl.createFramebufferInfo(gl);
+
+      const uniforms = {
+        u_frame: texture,
+        u_repairedPass: fboA.attachments[0],
+        u_texelSize: [0, 0],
+        u_repairRadius: 1.0,
+        u_repairStrength: 1.0,
+        u_edgeSensitivity: 0.08,
+        u_casSharpness: 0.5,
+      };
+
+      ['repairRadius', 'repairStrength', 'edgeSensitivity', 'casSharpness'].forEach(key => {
+        const slider = document.getElementById(key);
+        const span = document.getElementById(key + 'Val');
+        slider.addEventListener('input', (e) => {
+          const value = parseFloat(e.target.value);
+          uniforms['u_' + key] = value;
+          span.textContent = value.toFixed(2);
+        });
+      });
+
+      function render(time) {
+        if (twgl.resizeCanvasToDisplaySize(gl.canvas)) {
+            twgl.resizeFramebufferInfo(gl, fboA);
+            uniforms.u_texelSize = [1 / gl.canvas.width, 1 / gl.canvas.height];
+        }
+
+        // Pass 1: Repair Image (Original -> FBO A)
+        twgl.bindFramebufferInfo(gl, fboA);
+        gl.useProgram(repairProgram.program);
+        twgl.setBuffersAndAttributes(gl, repairProgram, quad);
+        twgl.setUniforms(repairProgram, uniforms);
+        gl.drawArrays(gl.TRIANGLES, 0, quad.numElements);
+
+        // Pass 2: Sharpen Repaired Image (FBO A -> Screen)
+        twgl.bindFramebufferInfo(gl, null);
+        gl.useProgram(sharpenProgram.program);
+        twgl.setBuffersAndAttributes(gl, sharpenProgram, quad);
+        twgl.setUniforms(sharpenProgram, uniforms);
+        gl.drawArrays(gl.TRIANGLES, 0, quad.numElements);
+
+        requestAnimationFrame(render);
+      }
+      requestAnimationFrame(render);
+    }
+    main();
+    </script>
+</body>
+</html>

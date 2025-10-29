@@ -1,0 +1,155 @@
+<!DOCTYPE html>
+<html lang="zh-Hant">
+
+<head>
+    <meta charset="UTF-8">
+    <title>WebGL 進階影像增強</title>
+    <style>
+        body {
+            margin: 0;
+            overflow: hidden;
+            background-color: #333;
+            font-family: sans-serif;
+        }
+
+        canvas {
+            display: block;
+            width: 100vw;
+            height: 100vh;
+        }
+
+        #controls {
+            position: absolute;
+            top: 10px;
+            left: 10px;
+            background: rgba(0, 0, 0, 0.6);
+            color: white;
+            padding: 15px;
+            border-radius: 5px;
+            width: 300px;
+        }
+
+        .control-group {
+            margin-bottom: 10px;
+        }
+
+        .control-group label {
+            display: block;
+            margin-bottom: 5px;
+        }
+
+        .control-group input {
+            width: 100%;
+        }
+
+        .control-group span {
+            float: right;
+        }
+    </style>
+</head>
+
+<body>
+    <canvas id="canvas"></canvas>
+
+    <div id="controls">
+        <div class="control-group">
+            <label>--- 引導式去色塊 ---</label>
+        </div>
+        <div class="control-group">
+            <label for="guideStrength">濾波強度 <span id="guideStrengthVal">0.75</span></label>
+            <input type="range" id="guideStrength" min="0" max="1" step="0.01" value="0.75">
+        </div>
+        <div class="control-group">
+            <label for="guideSigma">顏色敏感度 <span id="guideSigmaVal">0.20</span></label>
+            <input type="range" id="guideSigma" min="0" max="1" step="0.01" value="0.20">
+        </div>
+        <hr>
+        <div class="control-group">
+            <label>--- CAS 智慧銳化 ---</label>
+        </div>
+        <div class="control-group">
+            <label for="casStrength">銳化強度 <span id="casStrengthVal">0.5</span></label>
+            <input type="range" id="casStrength" min="0" max="2" step="0.05" value="0.5">
+        </div>
+    </div>
+
+    <script src="https://twgljs.org/dist/4.x/twgl-full.min.js"></script>
+
+    <script>
+        async function main() {
+            const canvas = document.getElementById("canvas");
+            const gl = twgl.getWebGLContext(canvas);
+            if (!gl) return alert("WebGL not supported");
+
+            const shaderSources = await Promise.all([
+                fetch('../GLSL/vertex.glsl').then(r => r.text()),
+                fetch('../GLSL/ver1.0/pass1-guide.fs.glsl').then(r => r.text()),
+                fetch('../GLSL/ver1.0/pass2-enhance.fs.glsl').then(r => r.text()),
+            ]);
+            const [vs, fs_guide, fs_enhance] = shaderSources;
+
+            const guideProgram = twgl.createProgramInfo(gl, [vs, fs_guide]);
+            const enhanceProgram = twgl.createProgramInfo(gl, [vs, fs_enhance]);
+
+            if (!guideProgram || !enhanceProgram) return console.error("Shader compilation failed.");
+
+            const arrays = { position: [-1, -1, 0, 1, -1, 0, -1, 1, 0, -1, 1, 0, 1, -1, 0, 1, 1, 0] };
+            const quad = twgl.createBufferInfoFromArrays(gl, arrays);
+
+            const texture = twgl.createTexture(gl, {
+                src: "test.png", crossOrigin: '', flipY: true, min: gl.LINEAR, mag: gl.LINEAR, wrap: gl.CLAMP_TO_EDGE,
+            });
+
+            const fboA = twgl.createFramebufferInfo(gl);
+
+            const uniforms = {
+                u_frame: texture,
+                u_guide: fboA.attachments[0],
+                u_texelSize: [0, 0],
+                u_guideStrength: 0.75,
+                u_guideSigma: 0.20,
+                u_casStrength: 0.5,
+            };
+
+            // --- Connect Controls ---
+            ['guideStrength', 'guideSigma', 'casStrength'].forEach(key => {
+                const slider = document.getElementById(key);
+                const span = document.getElementById(key + 'Val');
+                slider.addEventListener('input', (e) => {
+                    const value = parseFloat(e.target.value);
+                    uniforms['u_' + key] = value;
+                    span.textContent = value.toFixed(2);
+                });
+            });
+
+            function render(time) {
+                if (twgl.resizeCanvasToDisplaySize(gl.canvas)) {
+                    twgl.resizeFramebufferInfo(gl, fboA);
+                    uniforms.u_texelSize = [1 / gl.canvas.width, 1 / gl.canvas.height];
+                }
+
+                // Pass 1: Generate Guidance Map (Original -> FBO A)
+                twgl.bindFramebufferInfo(gl, fboA);
+                gl.useProgram(guideProgram.program);
+                twgl.setBuffersAndAttributes(gl, guideProgram, quad);
+                twgl.setUniforms(guideProgram, uniforms);
+                gl.drawArrays(gl.TRIANGLES, 0, quad.numElements);
+
+                // Pass 2: Enhance Image (Original + FBO A -> Screen)
+                twgl.bindFramebufferInfo(gl, null);
+                gl.useProgram(enhanceProgram.program);
+                twgl.setBuffersAndAttributes(gl, enhanceProgram, quad);
+                // **關鍵**: 第二個 Pass 需要傳入兩個紋理
+                // u_frame (原始) 和 u_guide (Pass 1 結果)
+                twgl.setUniforms(enhanceProgram, uniforms);
+                gl.drawArrays(gl.TRIANGLES, 0, quad.numElements);
+
+                requestAnimationFrame(render);
+            }
+            requestAnimationFrame(render);
+        }
+        main();
+    </script>
+</body>
+
+</html>

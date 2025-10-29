@@ -1,10 +1,8 @@
-#version 300 es
+// 使用 GLSL ES 1.0 語法
+attribute vec4 position;
 
-// 輸入頂點位置 (-1.0 to 1.0)
-in vec4 position;
-
-// 輸出給片段著色器的紋理座標 (0.0 to 1.0)
-out vec2 v_texCoord;
+// 使用 varying 替代 out 關鍵字
+varying vec2 v_texCoord;
 
 void main() {
   // 直接將頂點位置傳遞給 gl_Position
