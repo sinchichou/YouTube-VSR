@@ -1,0 +1,68 @@
+<script>
+const canvas = document.getElementById("canvas");
+// 直接請求預設的 WebGL Context，以獲得最大相容性
+const gl = twgl.getWebGLContext(canvas);
+
+if (!gl) {
+  alert("您的瀏覽器不支援 WebGL");
+} else {
+  const vs = document.getElementById('vs').text;
+  const fs_deblock = document.getElementById('fs-pass1-deblock').text;
+  const fs_sharpen_denoise = document.getElementById('fs-pass2-sharpen-denoise').text;
+
+  const deblockProgram = twgl.createProgramInfo(gl, [vs, fs_deblock]);
+  const sharpenDenoiseProgram = twgl.createProgramInfo(gl, [vs, fs_sharpen_denoise]);
+
+  const arrays = {
+    position: [-1, -1, 0, 1, -1, 0, -1, 1, 0, -1, 1, 0, 1, -1, 0, 1, 1, 0],
+  };
+  const quad = twgl.createBufferInfoFromArrays(gl, arrays);
+
+  const texture = twgl.createTexture(gl, {
+      src: "https://i.imgur.com/2s212wz.jpg",
+      crossOrigin: '',
+      min: gl.LINEAR,
+      mag: gl.LINEAR,
+      wrap: gl.CLAMP_TO_EDGE,
+  });
+
+  const fboA = twgl.createFramebufferInfo(gl);
+
+  const uniforms = {
+    u_frame: texture,
+    u_texelSize: [0, 0],
+    u_deblockStrength: 10.0,
+    u_sharpenStrength: 2.5,
+    u_denoiseStrength: 8.0,
+    u_inputPass: null,
+  };
+
+  function render(time) {
+    if (twgl.resizeCanvasToDisplaySize(gl.canvas)) {
+        twgl.resizeFramebufferInfo(gl, fboA);
+        uniforms.u_texelSize = [1 / gl.canvas.width, 1 / gl.canvas.height];
+    }
+
+    // Pass 1: Deblock (原始影像 -> FBO A)
+    // *** FIX: 將 fBOA 改為 fboA ***
+    twgl.bindFramebufferInfo(gl, fboA);
+    gl.useProgram(deblockProgram.program);
+    twgl.setBuffersAndAttributes(gl, deblockProgram, quad);
+    uniforms.u_frame = texture;
+    twgl.setUniforms(deblockProgram, uniforms);
+    gl.drawArrays(gl.TRIANGLES, 0, quad.numElements);
+
+    // Pass 2: Sharpen + Denoise (FBO A -> 螢幕)
+    twgl.bindFramebufferInfo(gl, null);
+    gl.useProgram(sharpenDenoiseProgram.program);
+    twgl.setBuffersAndAttributes(gl, sharpenDenoiseProgram, quad);
+    uniforms.u_inputPass = fboA.attachments[0];
+    twgl.setUniforms(sharpenDenoiseProgram, uniforms);
+    gl.drawArrays(gl.TRIANGLES, 0, quad.numElements);
+
+    requestAnimationFrame(render);
+  }
+
+  requestAnimationFrame(render);
+}
+</script>
