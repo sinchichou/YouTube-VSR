@@ -1,0 +1,22 @@
+# Dependencies and build artifacts
+/node_modules
+/dist/
+/build/
+compiler/
+*.zip
+
+# Compiled shaders
+shader/**/*.spv
+
+# Local test files
+temp_test/
+temp_shader/
+
+
+# Environment files
+/.env
+
+# IDE and OS specific
+.vscode/
+.DS_Store
+
