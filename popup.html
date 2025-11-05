@@ -1,0 +1,123 @@
+<!DOCTYPE html>
+<html lang="zh-Hant">
+<head>
+    <meta charset="UTF-8">
+    <title>YouTube VSR 控制面板</title>
+    <style>
+        :root {
+            --bg-color: #282c34;
+            --panel-bg-color: #21252b;
+            --text-color: #abb2bf;
+            --header-color: #61afef;
+            --border-color: #3a3f4b;
+            --accent-color: #c678dd;
+            --accent-color-hover: #be50e7;
+            --item-hover-bg: #3a3f4b;
+            --danger-color: #e06c75;
+        }
+        body {
+            margin: 0;
+            background-color: var(--bg-color);
+            color: var(--text-color);
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            display: flex;
+            flex-direction: column;
+            width: 800px; /* 擴充功能彈出視窗的寬度 */
+            height: 600px; /* 擴充功能彈出視窗的高度 */
+            overflow: hidden;
+        }
+        h3 { 
+            background-color: var(--header-color); color: var(--panel-bg-color);
+            padding: 10px; margin: 0; font-size: 1.1em; text-align: center; user-select: none;
+        }
+        /* --- 上方控制列 --- */
+        #top-bar {
+            display: flex; align-items: center; justify-content: space-between;
+            padding: 8px 15px; background: var(--panel-bg-color); border-bottom: 1px solid var(--border-color);
+        }
+        #toggle-switch-container { display: flex; align-items: center; gap: 10px; }
+        .switch { position: relative; display: inline-block; width: 50px; height: 24px; }
+        .switch input { opacity: 0; width: 0; height: 0; }
+        .slider { position: absolute; cursor: pointer; top: 0; left: 0; right: 0; bottom: 0; background-color: #4b5263; transition: .4s; border-radius: 24px; }
+        .slider:before { position: absolute; content: ""; height: 16px; width: 16px; left: 4px; bottom: 4px; background-color: white; transition: .4s; border-radius: 50%; }
+        input:checked + .slider { background-color: var(--accent-color); }
+        input:checked + .slider:before { transform: translateX(26px); }
+
+        /* --- 主內容區 --- */
+        #main-container { display: flex; flex-grow: 1; min-height: 0; }
+        .panel {
+            background: var(--panel-bg-color);
+            border-right: 1px solid var(--border-color);
+            display: flex; flex-direction: column; overflow: hidden;
+        }
+        #shader-library { width: 220px; }
+        #pipeline-container { flex-grow: 1; display: flex; flex-direction: column; }
+        #properties-panel { width: 240px; border-right: none; }
+
+        #library-content, #pipeline-list, #properties-content { overflow-y: auto; flex-grow: 1; }
+        
+        /* 著色器庫 */
+        .shader-category > h4 { cursor: pointer; padding: 8px 12px; margin: 0; background: #333842; border-top: 1px solid var(--border-color); border-bottom: 1px solid var(--border-color); font-size: 0.9em; }
+        .shader-category > h4:hover { background: var(--item-hover-bg); }
+        .shader-list { list-style: none; padding: 0; margin: 0; }
+        .shader-list li { padding: 8px 15px; cursor: pointer; border-bottom: 1px solid var(--border-color); font-size: 0.85em; display: flex; justify-content: space-between; align-items: center; gap: 10px; }
+        .shader-list li:hover { background: var(--item-hover-bg); }
+        .shader-name { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; flex-grow: 1; }
+        .add-btn { background: var(--accent-color); color: white; border: none; padding: 4px 8px; border-radius: 3px; cursor: pointer; flex-shrink: 0; }
+        .add-btn:hover { background: var(--accent-color-hover); }
+
+        /* 渲染管線 */
+        #pipeline-list { min-height: 150px; padding: 5px; list-style: none; margin: 0;}
+        .pipeline-item { background: #333842; padding: 8px; margin-bottom: 5px; border-radius: 3px; cursor: grab; display: flex; justify-content: space-between; align-items: center; border: 1px solid transparent;}
+        .pipeline-item.selected { border-color: var(--accent-color); }
+        .pipeline-item:active { cursor: grabbing; }
+        .pipeline-item.drag-over { border-top: 2px solid var(--accent-color); }
+        .remove-btn { background: var(--danger-color); color: white; border: none; border-radius: 50%; width: 20px; height: 20px; cursor: pointer; line-height: 20px; text-align: center; flex-shrink: 0; }
+
+        /* 屬性面板 */
+        #properties-content { padding: 15px; }
+        .control-group { margin-bottom: 15px; }
+        .control-group label { display: block; margin-bottom: 5px; font-size: 0.9em; }
+        .control-group input[type="range"] { width: 100%; }
+        .control-group span { float: right; font-weight: bold; font-size: 0.9em; }
+        #placeholder-text { text-align: center; margin-top: 20px; font-style: italic; }
+    </style>
+</head>
+<body>
+
+    <div id="top-bar">
+        <h3>YouTube VSR 控制面板</h3>
+        <div id="toggle-switch-container">
+            <span>停用</span>
+            <label class="switch">
+                <input type="checkbox" id="master-toggle">
+                <span class="slider"></span>
+            </label>
+            <span>啟用</span>
+        </div>
+    </div>
+
+    <div id="main-container">
+
+        <div id="shader-library" class="panel">
+            <h3>著色器庫</h3>
+            <div id="library-content"></div>
+        </div>
+
+        <div id="pipeline-container" class="panel">
+            <h3>渲染管線 (可拖曳排序)</h3>
+            <ul id="pipeline-list"></ul>
+        </div>
+
+        <div id="properties-panel" class="panel">
+            <h3>屬性</h3>
+            <div id="properties-content">
+                <p id="placeholder-text">在管線中選擇一個效果以編輯其屬性。</p>
+            </div>
+        </div>
+
+    </div>
+
+    <script src="popup.js"></script>
+</body>
+</html>

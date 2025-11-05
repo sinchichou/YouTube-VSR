@@ -35,9 +35,9 @@
 | 資源 | 職責 | 解析度 | 數據格式 | 啟用條件 |
 | :--- | :--- | :--- | :--- | :--- |
 | $\mathbf{Texture_{Current}}$ | 儲存從 `<video>` 元素上傳的當前影格 $\mathbf{F_t}$。 | $\mathbf{R_{\text{Input}}}$ | `RGBA8` | **所有模式** |
-| $\mathbf{FBO_A}$ | **Pass 1 (空間增強)** 的輸出目標。其附加的紋理儲存了去塊和銳化後的結果。 | $\mathbf{R_{\text{Input}}}$ | `RGBA8` | **所有模式** |
-| $\mathbf{Texture_{History}}$ | 儲存**前一幀**的**最終增強結果** ($\mathbf{F_{t-1, \text{enhanced}}}$)。在 FSR 2 模式下，此紋理的內容會在每一幀結束時從 Canvas 後台緩衝區複製而來，用於下一幀的時間性比較。 | $\mathbf{R_{\text{Input}}}$ | `RGBA8` | **FSR 2 模式** |
-| $\mathbf{FBO_M}$ | **Pass 0 (光流)** 的輸出目標。其附加的紋理用於儲存像素的運動向量 $\mathbf{M}$。 | $\mathbf{R_{\text{Input}}}$ | `RG32F` (高精度浮點) | **FSR 2 模式** |
+| $\mathbf{FBO_A}$ | **Pass 1 (空間增強)** 的輸出目標。其附加的紋理儲存了去塊和銳化後的結果。 | $\mathbf{R_{	ext{Input}}}$ | `RGBA8` | **所有模式** |
+| $\mathbf{Texture_{History}}$ | 儲存**前一幀**的**最終增強結果** ($\\mathbf{F_{t-1, \text{enhanced}}}$)。在 FSR 2 模式下，此紋理的內容會在每一幀結束時從 Canvas 後台緩衝區複製而來，用於下一幀的時間性比較。 | $\mathbf{R_{\text{Input}}}$ | `RGBA8` | **FSR 2 模式** |
+| $\mathbf{FBO_M}$ | **Pass 0 (光流)** 的輸出目標。其附加的紋理用於儲存像素的運動向量 $\\mathbf{M}$。 | $\mathbf{R_{\text{Input}}}$ | `RG32F` (高精度浮點) | **FSR 2 模式** |
 | **Canvas Back Buffer** | 最終繪製到螢幕的目標，即 `<canvas>` 元素的默認 Framebuffer。 | $\mathbf{R_{\text{Target}}}$ | `RGBA8` | **所有模式** |
 
 ## 3. 渲染通道 (Render Pass) 結構與邏輯
@@ -75,8 +75,8 @@ graph TD
 
 | Pass | 模式 | 描述 | 輸入紋理 | 輸出緩衝 | Viewport 尺寸 |
 | :--- | :--- | :--- | :--- | :--- | :--- |
-| **Pass 1** | **所有模式** | **空間性增強 (Spatial Enhancement)**：對當前輸入影格執行去塊、銳化和基本的空間降噪。此通道是所有後續處理的基礎，旨在提升輸入畫質。 | `Texture_Current` | `FBO_A` | $\mathbf{R_{\text{Input}}}$ |
-| **Pass 0** | **FSR 2 專屬** | **光流計算 (Optical Flow)**：比較當前幀和歷史幀，計算每個像素的運動向量 $\mathbf{M}$，為 FSR 2 的運動補償提供數據。 | `Texture_Current`, `Texture_History` | `FBO_M` | $\mathbf{R_{\text{Input}}}$ |
+| **Pass 1** | **所有模式** | **空間性增強 (Spatial Enhancement)**：對當前輸入影格執行去塊、銳化和基本的空間降噪。此通道是所有後續處理的基礎，旨在提升輸入畫質。 | `Texture_Current`, `Texture_History` | `FBO_A` | $\mathbf{R_{\text{Input}}}$ |
+| **Pass 0** | **FSR 2 專屬** | **光流計算 (Optical Flow)**：比較當前幀和歷史幀，計算每個像素的運動向量 $\\mathbf{M}$，為 FSR 2 的運動補償提供數據。 | `Texture_Current`, `Texture_History` | `FBO_M` | $\mathbf{R_{\text{Input}}}$ |
 | **Pass 2** | **FSR 2 專屬** | **FSR 2 核心 (FSR 2 Core)**：此通道是 FSR 2 技術的核心，整合時間性數據。它使用運動向量來對齊歷史幀，累積顏色數據，並透過 EASU 演算法執行高品質的升頻或時間性降噪，最後由 RCAS 進行銳化。 | `FBO_A` (的紋理), `FBO_M` (的紋理), `Texture_History` | **Canvas Back Buffer** | $\mathbf{R_{\text{Target}}}$ |
 | **Pass 3** | **常規專屬** | **Passthrough 輸出**：一個簡單的直通繪製。直接將 Pass 1 處理後的結果繪製到 Canvas 上。此時 `R_Target` 應等於 `R_Input`。 | `FBO_A` (的紋理) | **Canvas Back Buffer** | $\mathbf{R_{\text{Input}}}$ |
 
@@ -217,12 +217,12 @@ function processFrame() {
 | :--- | :--- | :--- |
 | **GPU 運算 (GLSL)** | $\mathbf{0.5 \text{ ms} \sim 2 \text{ ms}}$ | **極度高效**。對於現代中階 GPU (如 RTX 4060)，處理 1080p 影片的雙 Pass 濾波或 FSR 2 計算負載極低，完全不是瓶頸所在。 |
 | **CPU/GPU 數據傳輸** | $3 \text{ ms} \sim 8 \text{ ms}$ | **主要瓶頸**。`gl.texImage2D(..., video)` 這個操作是整個管線中延遲最高的部分。它涉及將解碼後的影片幀從 CPU 記憶體（或 GPU 的專用解碼硬體）複製到 WebGL 可讀取的紋理內存中。此延遲受驅動程式、瀏覽器實現和系統負載影響。 |
-| **總處理延遲 ($\Delta t$)** | $\mathbf{3.5 \text{ ms} \sim 15 \text{ ms}}$ | 這是從音訊播放某個時間點的聲音，到我們在 Canvas 上顯示對應影像的總延遲。為確保同步穩定，我們設定一個**安全補償值 $\mathbf{\Delta t \approx 25 \text{ ms}}$**。 |
+| **總處理延遲 ($\\Delta t$)** | $\mathbf{3.5 \text{ ms} \sim 15 \text{ ms}}$ | 這是從音訊播放某個時間點的聲音，到我們在 Canvas 上顯示對應影像的總延遲。為確保同步穩定，我們設定一個**安全補償值 $\\mathbf{\\Delta t \approx 25 \text{ ms}}$**。 |
 | **即時可行性** | **可行** | 總延遲遠低於 60 FPS 所需的 **16.67 ms** 影格時間，證明此方案在技術上完全可行。 |
 
 #### 2. 影音同步核心策略：音訊驅動的強制跳幀
 
-由於我們的視覺管線引入了固定的延遲 $\Delta t$，Canvas 上的畫面會永久性地落後於 `<video>` 元素內部的音訊播放。必須採取主動同步策略。
+由於我們的視覺管線引入了固定的延遲 $\\Delta t$，Canvas 上的畫面會永久性地落後於 `<video>` 元素內部的音訊播放。必須採取主動同步策略。
 
 **核心思想**：將**音訊時脈 (`video.currentTime`)** 作為絕對的、不可動搖的「真理時間」，並強制我們的視覺管線去追趕它。
 
@@ -230,7 +230,7 @@ function processFrame() {
 | :--- | :--- | :--- |
 | **A. 準備** | 找到頁面上的 `<video>` 元素；創建 `<canvas>` 並覆蓋；`video.style.opacity = 0;`。 | 視覺上用 Canvas 替換 Video，但保留 Video 作為音訊播放器和數據源。 |
 | **B. 讀取音訊時脈** | 在 `processFrame` 迴圈的開頭，讀取 `const T_audio = video.currentTime;`。 | 獲取當前音訊播放到的精確時間點（以秒為單位）。這是我們的同步基準。 |
-| **C. 計算目標視覺時脈** | `const T_target = T_audio - 0.025;` (即 $T_{\text{audio}} - \Delta t$) | 考慮到我們的處理延遲 $\Delta t$，我們需要渲染的影格，實際上是音訊時脈之前的那個時間點的影格。 |
+| **C. 計算目標視覺時脈** | `const T_target = T_audio - 0.025;` (即 $T_{\text{audio}} - \\Delta t$) | 考慮到我們的處理延遲 $\\Delta t$，我們需要渲染的影格，實際上是音訊時脈之前的那個時間點的影格。 |
 | **D. 核心：誤差修正與強制跳幀** | `if (Math.abs(video.currentTime - T_target) > 0.1) { video.currentTime = T_target; }` | **這是最關鍵的一步**。我們週期性地檢查 `<video>` 的當前數據源時間點是否與我們的目標時間點 `T_target` 相差過大（例如超過 100ms）。如果誤差累積，意味著影片解碼或系統卡頓導致數據源落後，此時我們必須**強制 video seek** 到我們需要的位置，**丟棄中間掉落的影格**，以防止影音失步。 |
 | **E. 渲染** | `gl.texImage2D(..., video);` | 在 `video` 的時間點被校準後，執行此操作，確保我們上傳到 GPU 的是與音訊同步的正確影格。 |
 
@@ -241,3 +241,12 @@ function processFrame() {
 | **執行環境** | **必須是瀏覽器擴充功能的 Content Script**。只有 Content Script 才有權限直接存取和操作頁面 DOM 中的 `<video>` 元素，並繞過對影片紋理數據的跨域（CORS）讀取限制。 |
 | **同步控制** | 對 `<video>` 元素的 `currentTime` 屬性進行讀取和寫入（Seek）是實現精確同步的**唯一可靠手段**。`requestVideoFrameCallback` 等 API 雖然能提供影片幀信息，但無法給予我們修正誤差所需的強制控制權。 |
 | **用戶體驗考量** | 強制 Seek (`video.currentTime = ...`) 可能會導致極其短暫的播放停頓。因此，誤差容忍度（上例中的 `0.1` 秒）需要仔細調校。一個較大的容忍度可以減少 Seek 次數，但可能在某些情況下導致短暫的失步感。建議設置一個合理的閾值，並只在誤差超過該閾值時才進行校準，例如每秒檢查一次。 |
+
+## 8. 著色器檔案類型與相容性 (Shader File Types and Compatibility)
+
+本專案主要使用 HLSL (High-Level Shading Language) 著色器，並透過 JavaScript 進行即時轉換以適應 WebGL 環境。
+
+-   **HLSL (.hlsl)**：這是本專案目前支援的主要著色器語言。`shader_pipeline_tester.html` 會自動將 HLSL 程式碼轉換為 GLSL (OpenGL Shading Language) 以便在 WebGL 上執行。
+-   **WGSL (.wgsl)**：專案中也包含 WGSL (WebGPU Shading Language) 著色器檔案。**請注意，WGSL 著色器目前不直接支援基於 WebGL 的 `shader_pipeline_tester.html`。** WGSL 是為 WebGPU 設計的，若要使用 WGSL 著色器，需要將測試器遷移至 WebGPU 環境，或使用 WGSL 到 GLSL 的轉譯器。目前，`shader_pipeline_tester.html` 會列出 WGSL 檔案，但嘗試將其加入渲染管線時會提示不相容。
+
+```

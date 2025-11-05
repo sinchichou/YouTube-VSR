@@ -1,0 +1,21 @@
+{
+  "name": "youtube-vsr",
+  "version": "1.0.0",
+  "description": "**版本：** 1.0 **作者：** Gemini AI **日期：** 2025年10月29日",
+  "main": "index.js",
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/sinchichou/YouTube-VSR.git"
+  },
+  "keywords": [],
+  "author": "",
+  "license": "ISC",
+  "type": "commonjs",
+  "bugs": {
+    "url": "https://github.com/sinchichou/YouTube-VSR/issues"
+  },
+  "homepage": "https://github.com/sinchichou/YouTube-VSR#readme"
+}

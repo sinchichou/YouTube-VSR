@@ -1,0 +1,12 @@
+{
+  "ExpandedNodes": [
+    "",
+    "\\compiler",
+    "\\compiler\\dxc",
+    "\\effects",
+    "\\effects_spv",
+    "\\effects_wgsl",
+    "\\temp_test"
+  ],
+  "PreviewInSolutionExplorer": false
+}

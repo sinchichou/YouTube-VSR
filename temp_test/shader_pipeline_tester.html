@@ -1,0 +1,1030 @@
+<!DOCTYPE html>
+<html lang="zh-Hant">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    
+        <title>WebGPU 動態著色器管線測試器</title>
+        <style>
+            :root {
+                --bg-color: #282c34;
+                --panel-bg-color: #21252b;
+                --text-color: #abb2bf;
+                --header-color: #61afef;
+                --border-color: #3a3f4b;
+                --accent-color: #c678dd;
+                --accent-color-hover: #be50e7;
+                --item-hover-bg: #3a3f4b;
+            }
+    
+            body {
+                margin: 0;
+                overflow: hidden;
+                background-color: var(--bg-color);
+                color: var(--text-color);
+                font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+                display: flex;
+                height: 100vh;
+            }
+    
+            .panel {
+                background: var(--panel-bg-color);
+                border-left: 1px solid var(--border-color);
+                display: flex;
+                flex-direction: column;
+                transition: width 0.3s ease;
+                width: 350px;
+                flex-shrink: 0;
+            }
+    
+            .panel.collapsed {
+                width: 50px;
+                cursor: pointer;
+            }
+    
+            .panel.collapsed> :not(h3) {
+                display: none;
+            }
+    
+            .panel h3 {
+                background-color: var(--header-color);
+                color: var(--bg-color);
+                padding: 10px;
+                margin: 0;
+                font-size: 1.1em;
+                text-align: center;
+                cursor: pointer;
+                user-select: none;
+                height: 2.5em;
+                display: flex;
+                align-items: center;
+                justify-content: center;
+            }
+    
+            .panel.collapsed h3 {
+                writing-mode: vertical-rl;
+                transform: rotate(180deg);
+                width: 100%;
+                height: 100%;
+                padding: 0;
+            }
+    
+            #main-content {
+                flex-grow: 1;
+                display: flex;
+                flex-direction: column;
+                border-left: 1px solid var(--border-color);
+                min-width: 0;
+            }
+    
+            #controls-bar {
+                padding: 8px;
+                background: var(--panel-bg-color);
+                border-bottom: 1px solid var(--border-color);
+                flex-shrink: 0;
+                display: flex;
+                justify-content: center;
+                align-items: center;
+                gap: 20px;
+            }
+    
+            .control-button,
+            #image-loader-label {
+                background-color: var(--accent-color);
+                color: white;
+                padding: 8px 15px;
+                border-radius: 4px;
+                cursor: pointer;
+                transition: background-color 0.2s;
+                border: none;
+                font-family: inherit;
+                font-size: 14px;
+            }
+    
+            .control-button:hover,
+            #image-loader-label:hover {
+                background-color: var(--accent-color-hover);
+            }
+    
+            #image-loader {
+                display: none;
+            }
+            
+            #view-controls {
+                display: flex;
+                align-items: center;
+                gap: 10px;
+            }
+    
+            #zoom-level-display {
+                font-size: 14px;
+                font-weight: bold;
+                min-width: 50px;
+                text-align: center;
+            }
+    
+            #canvas-container {
+                flex-grow: 1;
+                display: flex;
+                gap: 10px;
+                padding: 10px;
+                min-height: 0;
+                cursor: grab;
+            }
+    
+            #canvas-container:active {
+                cursor: grabbing;
+            }
+    
+            .canvas-wrapper {
+                flex: 1;
+                display: flex;
+                flex-direction: column;
+                background: #202328;
+                border-radius: 4px;
+                overflow: hidden;
+                border: 1px solid var(--border-color);
+            }
+    
+            .canvas-wrapper h4 {
+                text-align: center;
+                margin: 0;
+                padding: 8px;
+                background: #333842;
+                font-size: 0.9em;
+                flex-shrink: 0;
+            }
+    
+            canvas {
+                display: block;
+                width: 100%;
+                height: 100%;
+            }
+    
+            #pipeline-panel {
+                height: 200px;
+                border-top: 1px solid var(--border-color);
+                flex-shrink: 0;
+            }
+    
+            #library-content,
+            #properties-content,
+            #pipeline-list {
+                overflow-y: auto;
+            }
+    
+            .shader-category>h4 {
+                cursor: pointer;
+                padding: 8px 12px;
+                margin: 0;
+                background: #333842;
+                border-top: 1px solid var(--border-color);
+                border-bottom: 1px solid var(--border-color);
+                font-size: 0.9em;
+            }
+    
+            .shader-category>h4:hover {
+                background: var(--item-hover-bg);
+            }
+    
+            .shader-list {
+                list-style: none;
+                padding: 0;
+                margin: 0;
+                display: none;
+            }
+    
+            .shader-list li {
+                padding: 8px 15px;
+                cursor: pointer;
+                border-bottom: 1px solid var(--border-color);
+                font-size: 0.85em;
+                display: flex;
+                justify-content: space-between;
+                align-items: center;
+                gap: 10px;
+            }
+    
+            .shader-list li .shader-name {
+                white-space: nowrap;
+                overflow: hidden;
+                text-overflow: ellipsis;
+                flex-grow: 1;
+            }
+    
+            .shader-list li:hover {
+                background: var(--item-hover-bg);
+            }
+    
+            .add-btn {
+                background: var(--accent-color);
+                color: white;
+                border: none;
+                padding: 4px 8px;
+                border-radius: 3px;
+                cursor: pointer;
+                flex-shrink: 0;
+            }
+    
+            .add-btn:hover {
+                background: var(--accent-color-hover);
+            }
+    
+            #pipeline-list {
+                height: calc(100% - 40px);
+            }
+    
+            .pipeline-item {
+                background: #333842;
+                padding: 8px;
+                margin-bottom: 5px;
+                border-radius: 3px;
+                cursor: grab;
+                display: flex;
+                justify-content: space-between;
+                align-items: center;
+                border: 1px solid transparent;
+            }
+    
+            .pipeline-item.selected {
+                border-color: var(--accent-color);
+            }
+    
+            .pipeline-item:active {
+                cursor: grabbing;
+            }
+            
+            .pipeline-item.drag-over {
+                border-top: 2px solid var(--accent-color);
+            }
+    
+            .remove-btn {
+                background: #e06c75;
+                color: white;
+                border: none;
+                border-radius: 50%;
+                width: 20px;
+                height: 20px;
+                cursor: pointer;
+                line-height: 20px;
+                text-align: center;
+                flex-shrink: 0;
+            }
+    
+            #properties-content {
+                padding: 15px;
+                flex-grow: 1;
+            }
+    
+            .control-group {
+                margin-bottom: 15px;
+            }
+    
+            .control-group label {
+                display: block;
+                margin-bottom: 5px;
+                font-size: 0.9em;
+            }
+    
+            .control-group input[type="range"] {
+                width: 100%;
+            }
+    
+            .control-group span {
+                float: right;
+                font-weight: bold;
+            }
+    
+            #placeholder-text {
+                text-align: center;
+                margin-top: 20px;
+                font-style: italic;
+            }
+        </style>
+    </head>
+    
+    <body>
+    
+        <div id="shader-library" class="panel">
+            <h3>著色器庫</h3>
+            <div id="library-content"></div>
+        </div>
+    
+        <div id="main-content">
+            <div id="controls-bar">
+                <label id="image-loader-label" for="image-loader">選擇圖片</label>
+                <input type="file" id="image-loader" accept="image/*">
+                <div id="view-controls">
+                    <button id="fit-view-btn" class="control-button">符合畫面</button>
+                    <button id="reset-view-btn" class="control-button">1:1</button>
+                    <span id="zoom-level-display">100%</span>
+                </div>
+            </div>
+            <div id="canvas-container">
+                <div class="canvas-wrapper">
+                    <h4>未處理</h4>
+                    <canvas id="canvas-original"></canvas>
+                </div>
+                <div class="canvas-wrapper">
+                    <h4>已處理</h4>
+                    <canvas id="canvas-processed"></canvas>
+                </div>
+            </div>
+            <div id="pipeline-panel" class="panel">
+                <h3>渲染管線 (可拖曳排序)</h3>
+                <ul id="pipeline-list"></ul>
+            </div>
+        </div>
+    
+        <div id="properties-panel" class="panel">
+            <h3>屬性</h3>
+            <div id="properties-content">
+                <p id="placeholder-text">在管線中選擇一個效果以編輯其屬性。</p>
+            </div>
+        </div>
+    
+        <script>
+                const ALL_SHADERS = [
+                    "effects_wgsl/Deband.wgsl"
+                    // Add other WGSL shaders here
+                ];
+        
+                async function main() {
+                    if (!navigator.gpu) {
+                        alert("WebGPU not supported on this browser.");
+                        return;
+                    }
+        
+                    const adapter = await navigator.gpu.requestAdapter();
+                    if (!adapter) {
+                        alert("No appropriate GPUAdapter found.");
+                        return;
+                    }
+                    const device = await adapter.requestDevice();
+        
+                    // --- Canvas & Context ---
+                    const canvasOriginal = document.getElementById("canvas-original");
+                    const ctxOriginal = canvasOriginal.getContext('2d');
+                    const canvasProcessed = document.getElementById("canvas-processed");
+                    const context = canvasProcessed.getContext('webgpu');
+                    const presentationFormat = navigator.gpu.getPreferredCanvasFormat();
+                    
+                    let presentationSize = [canvasProcessed.clientWidth, canvasProcessed.clientHeight];
+                    context.configure({
+                        device,
+                        format: presentationFormat,
+                        size: presentationSize,
+                        alphaMode: 'premultiplied'
+                    });
+        
+                    // --- State ---
+                    const pipeline = [];
+                    let selectedPipelineItem = null;
+                    let sourceImage;
+                    let sourceTexture;
+                    let pingPongTextures = [];
+                    const sampler = device.createSampler({
+                        magFilter: 'linear',
+                        minFilter: 'linear'
+                    });
+        
+                    // --- Pan & Zoom State ---
+                    let scale = 1.0;
+                    let offsetX = 0;
+                    let offsetY = 0;
+                    let isDragging = false;
+                    let lastX, lastY;
+                    const MIN_SCALE = 0.1;
+                    const MAX_SCALE = 30;
+        
+                    // --- Shaders & Pipelines ---
+                    const fullScreenQuadVsModule = device.createShaderModule({
+                        label: 'fullScreenQuadVsModule',
+                        code: `
+                            @vertex
+                            fn main(@builtin(vertex_index) vi : u32) -> @builtin(position) vec4<f32> {
+                                let pos = array<vec2<f32>, 6>(
+                                    vec2<f32>(-1.0, -1.0), vec2<f32>(1.0, -1.0), vec2<f32>(-1.0, 1.0),
+                                    vec2<f32>(-1.0, 1.0), vec2<f32>(1.0, -1.0), vec2<f32>(1.0, 1.0)
+                                );
+                                return vec4<f32>(pos[vi], 0.0, 1.0);
+                            }
+                        `,
+                    });
+        
+                    const panZoomFsModule = device.createShaderModule({
+                        label: 'panZoomFsModule',
+                        code: `
+                            @group(0) @binding(0) var mySampler: sampler;
+                            @group(0) @binding(1) var myTexture: texture_2d<f32>;
+                            
+                            @fragment
+                            fn main(@builtin(position) pos: vec4<f32>) -> @location(0) vec4<f32> {
+                                let uv = (pos.xy / 2.0 + 0.5);
+                                return textureSample(myTexture, mySampler, uv);
+                            }
+                        `,
+                    });
+                    
+                    const panZoomPipeline = device.createRenderPipeline({
+                        label: 'panZoomPipeline',
+                        layout: 'auto',
+                        vertex: { module: fullScreenQuadVsModule, entryPoint: 'main' },
+                        fragment: {
+                            module: panZoomFsModule,
+                            entryPoint: 'main',
+                            targets: [{ format: presentationFormat }]
+                        },
+                        primitive: { topology: 'triangle-list' }
+                    });
+        
+                    const panZoomUniformBuffer = device.createBuffer({
+                        label: 'panZoomUniformBuffer',
+                        size: 16, // 2 * vec2<f32> with alignment
+                        usage: GPUBufferUsage.UNIFORM | GPUBufferUsage.COPY_DST,
+                    });
+        
+                    // --- UI Elements ---
+                    const libraryContent = document.getElementById('library-content');
+                    const pipelineList = document.getElementById('pipeline-list');
+                    const propertiesContent = document.getElementById('properties-content');
+                    const placeholderText = document.getElementById('placeholder-text');
+                    const zoomLevelDisplay = document.getElementById('zoom-level-display');
+        
+                    // --- UI Setup & Event Listeners ---
+                    document.querySelectorAll('.panel h3').forEach(header => {
+                        header.addEventListener('click', () => header.parentElement.classList.toggle('collapsed'));
+                    });
+                     document.querySelectorAll('.panel').forEach(panel => {
+                        panel.addEventListener('click', (e) => {
+                            if (panel.classList.contains('collapsed')) {
+                                panel.classList.remove('collapsed');
+                            }
+                        });
+                    });
+        
+                    document.getElementById('fit-view-btn').addEventListener('click', fitToView);
+                    document.getElementById('reset-view-btn').addEventListener('click', resetViewTo100Percent);
+        
+                    function buildShaderLibrary() {
+                        const wgslShaders = ALL_SHADERS.filter(s => s.endsWith('.wgsl'));
+                        const categories = wgslShaders.reduce((acc, path) => {
+                            const parts = path.split('/');
+                            const category = parts.length > 2 ? parts[1] : 'Root';
+                            if (!acc[category]) acc[category] = [];
+                            acc[category].push(path);
+                            return acc;
+                        }, {});
+        
+                        libraryContent.innerHTML = '';
+                        for (const category in categories) {
+                            const catDiv = document.createElement('div');
+                            catDiv.className = 'shader-category';
+                            const title = document.createElement('h4');
+                            title.textContent = category;
+                            const list = document.createElement('ul');
+                            list.className = 'shader-list';
+                            title.onclick = () => {
+                                list.style.display = list.style.display === 'block' ? 'none' : 'block';
+                            };
+                            categories[category].forEach(path => {
+                                const item = document.createElement('li');
+                                item.title = path;
+                                const nameSpan = document.createElement('span');
+                                nameSpan.className = 'shader-name';
+                                nameSpan.textContent = path.split('/').pop();
+                                const addButton = document.createElement('button');
+                                addButton.textContent = 'Add';
+                                addButton.className = 'add-btn';
+                                addButton.onclick = (e) => {
+                                    e.stopPropagation();
+                                    addShaderToPipeline(path);
+                                };
+                                item.appendChild(nameSpan);
+                                item.appendChild(addButton);
+                                list.appendChild(item);
+                            });
+                            catDiv.appendChild(title);
+                            catDiv.appendChild(list);
+                            libraryContent.appendChild(catDiv);
+                        }
+                    }
+        
+                    async function addShaderToPipeline(path) {
+                        try {
+                            const code = await (await fetch(`../${path}`)).text();
+                            const shaderModule = device.createShaderModule({ label: `shaderModule_${path}`, code });
+                            
+                            const compilationInfo = await shaderModule.getCompilationInfo();
+                            if (compilationInfo.messages.some(m => m.type === 'error')) {
+                                console.error(`Error compiling ${path}:`, compilationInfo.messages);
+                                alert(`著色器編譯失敗: ${path}\n\n${compilationInfo.messages.map(m => m.message).join('\n')}`);
+                                return;
+                            }
+        
+                            const renderPipeline = device.createRenderPipeline({
+                                label: `renderPipeline_${path.split('/').pop()}`,
+                                layout: 'auto',
+                                vertex: { module: fullScreenQuadVsModule, entryPoint: 'main' },
+                                fragment: {
+                                    module: shaderModule,
+                                    entryPoint: 'main',
+                                    targets: [{ format: 'rgba8unorm' }]
+                                },
+                                primitive: { topology: 'triangle-list' }
+                            });
+        
+                            const { uniforms, textureBindings, samplerBindings } = parseUniforms(code);
+                            const uniformBuffer = device.createBuffer({
+                                label: `uniformBuffer_${path}`,
+                                size: uniforms.size, // Correctly access size
+                                usage: GPUBufferUsage.UNIFORM | GPUBufferUsage.COPY_DST,
+                            });
+                            
+                            const initialUniformData = new Float32Array(uniforms.size / 4);
+                            let hasValues = false;
+                            Object.values(uniforms.properties).forEach(prop => {
+                                initialUniformData[prop.offset / 4] = prop.value;
+                                hasValues = true;
+                            });
+                            if (hasValues) {
+                               device.queue.writeBuffer(uniformBuffer, 0, initialUniformData);
+                            }
+        
+                            const newItem = {
+                                id: `item-${Date.now()}`,
+                                path,
+                                name: path.split('/').pop(),
+                                pipeline: renderPipeline,
+                                uniforms: uniforms, // Store the correct uniforms object
+                                textureBindings,
+                                samplerBindings,
+                                uniformBuffer,
+                            };
+                            pipeline.push(newItem);
+                            renderPipelineUI();
+                        } catch (e) {
+                            console.error(`Failed to load or create pipeline for shader ${path}`, e);
+                            alert(`無法載入或為著色器建立管線: ${path}`);
+                        }
+                    }
+        
+                    function renderPipelineUI() {
+                        // (Implementation for UI rendering, drag-drop, selection etc.)
+                         pipelineList.innerHTML = '';
+                        pipeline.forEach((item, index) => {
+                            const li = document.createElement('li');
+                            li.className = 'pipeline-item';
+                            li.dataset.id = item.id;
+                            li.draggable = true;
+                            
+                            const name = document.createElement('span');
+                            name.textContent = `${index + 1}. ${item.name}`;
+                            li.appendChild(name);
+        
+                            const removeBtn = document.createElement('button');
+                            removeBtn.className = 'remove-btn';
+                            removeBtn.innerHTML = '&times;';
+                            removeBtn.onclick = (e) => {
+                                e.stopPropagation();
+                                const itemIndex = pipeline.findIndex(p => p.id === item.id);
+                                if (itemIndex > -1) {
+                                    pipeline.splice(itemIndex, 1);
+                                    if (selectedPipelineItem && selectedPipelineItem.id === item.id) {
+                                        selectedPipelineItem = null;
+                                        renderPropertiesUI(null);
+                                    }
+                                    renderPipelineUI();
+                                }
+                            };
+                            li.appendChild(removeBtn);
+                            
+                            li.addEventListener('click', () => {
+                                selectedPipelineItem = item;
+                                document.querySelectorAll('.pipeline-item').forEach(el => el.classList.remove('selected'));
+                                li.classList.add('selected');
+                                renderPropertiesUI(item);
+                            });
+        
+                            // Drag and Drop
+                            li.addEventListener('dragstart', (e) => {
+                                e.dataTransfer.setData('text/plain', item.id);
+                                e.dataTransfer.effectAllowed = 'move';
+                            });
+                            li.addEventListener('dragover', (e) => {
+                                e.preventDefault();
+                                document.querySelectorAll('.pipeline-item').forEach(el => el.classList.remove('drag-over'));
+                                li.classList.add('drag-over');
+                            });
+                             li.addEventListener('dragleave', () => {
+                                li.classList.remove('drag-over');
+                            });
+                            li.addEventListener('drop', (e) => {
+                                e.preventDefault();
+                                li.classList.remove('drag-over');
+                                const sourceId = e.dataTransfer.getData('text/plain');
+                                const sourceIndex = pipeline.findIndex(p => p.id === sourceId);
+                                const targetIndex = pipeline.findIndex(p => p.id === item.id);
+        
+                                if (sourceIndex !== -1 && targetIndex !== -1) {
+                                    const [movedItem] = pipeline.splice(sourceIndex, 1);
+                                    pipeline.splice(targetIndex, 0, movedItem);
+                                    renderPipelineUI();
+                                }
+                            });
+        
+                            pipelineList.appendChild(li);
+                        });
+        
+                        if (selectedPipelineItem) {
+                            const stillExists = pipeline.find(p => p.id === selectedPipelineItem.id);
+                            if (!stillExists) {
+                                selectedPipelineItem = null;
+                                renderPropertiesUI(null);
+                            } else {
+                                const el = pipelineList.querySelector(`[data-id="${selectedPipelineItem.id}"]`);
+                                if (el) el.classList.add('selected');
+                            }
+                        }
+                    }
+                    
+                    function renderPropertiesUI(item) {
+                        if (!item || Object.keys(item.uniforms.properties).length === 0) {
+                            propertiesContent.innerHTML = '';
+                            propertiesContent.appendChild(placeholderText);
+                            placeholderText.style.display = 'block';
+                            return;
+                        }
+                        placeholderText.style.display = 'none';
+                        propertiesContent.innerHTML = '';
+                        Object.values(item.uniforms.properties).forEach(uniform => {
+                            const group = document.createElement('div');
+                            group.className = 'control-group';
+                            const valueSpan = document.createElement('span');
+                            valueSpan.id = `${item.id}-${uniform.name}-val`;
+                            valueSpan.textContent = uniform.value.toFixed(uniform.step < 0.1 ? 2 : 3);
+                            const label = document.createElement('label');
+                            label.setAttribute('for', `${item.id}-${uniform.name}`);
+                            label.textContent = uniform.name;
+                            label.appendChild(valueSpan);
+                            const input = document.createElement('input');
+                            input.type = 'range';
+                            input.id = `${item.id}-${uniform.name}`;
+                            input.min = uniform.min;
+                            input.max = uniform.max;
+                            input.step = uniform.step;
+                            input.value = uniform.value;
+                            input.addEventListener('input', (e) => {
+                                const value = parseFloat(e.target.value);
+                                uniform.value = value;
+                                valueSpan.textContent = value.toFixed(uniform.step < 0.1 ? 2 : 3);
+                                const data = new Float32Array([value]);
+                                device.queue.writeBuffer(item.uniformBuffer, uniform.offset, data);
+                            });
+                            group.appendChild(label);
+                            group.appendChild(input);
+                            propertiesContent.appendChild(group);
+                        });
+                    }
+        
+                    function parseUniforms(shaderCode) {
+                        const uniforms = { properties: {}, size: 0, binding: -1 };
+                        const textureBindings = [];
+                        const samplerBindings = [];
+
+                        // Parse uniform struct binding
+                        const uniformRegex = /@group\(0\)\s*@binding\((\d+)\)\s*var<uniform>\s*(\w+)\s*:\s*(\w+)\s*;/;
+                        const uniformMatch = shaderCode.match(uniformRegex);
+                        if (uniformMatch) {
+                            uniforms.binding = parseInt(uniformMatch[1], 10);
+                            const structName = uniformMatch[3];
+                            
+                            const structRegex = new RegExp(`struct\\s+${structName}\\\s*{([^}]+)}`, 's');
+                            const structMatch = shaderCode.match(structRegex);
+                            if (structMatch) {
+                                const membersRegex = /([^;]+);/g;
+                                let memberMatch;
+                                let currentOffset = 0;
+                                while ((memberMatch = membersRegex.exec(structMatch[1])) !== null) {
+                                    const memberLine = memberMatch[1].trim();
+                                    const parts = memberLine.split(':');
+                                    if (parts.length < 2) continue;
+                                    
+                                    const name = parts[0].replace(/@.*/, '').trim();
+                                    const type = parts[1].trim();
+                                    
+                                    if (type === 'f32') {
+                                         const line = memberMatch[0]; // Full line with comment
+                                         const min = /ui_min=([0-9.-]+)/.exec(line)?.[1] ?? 0.0;
+                                         const max = /ui_max=([0-9.-]+)/.exec(line)?.[1] ?? 1.0;
+                                         const step = /ui_step=([0-9.-]+)/.exec(line)?.[1] ?? 0.01;
+                                         const def = /ui_default=([0-9.-]+)/.exec(line)?.[1] ?? 0.5;
+        
+                                         uniforms.properties[name] = {
+                                            name: name,
+                                            type: 'f32',
+                                            value: parseFloat(def),
+                                            min: parseFloat(min),
+                                            max: parseFloat(max),
+                                            step: parseFloat(step),
+                                            offset: currentOffset,
+                                        };
+                                        currentOffset += 4;
+                                    }
+                                }
+                                uniforms.size = Math.max(16, Math.ceil(currentOffset / 16) * 16); // Ensure min size of 16
+                            }
+                        }
+
+                        // Parse texture bindings
+                        const textureBindingRegex = /@group\(0\)\s*@binding\((\d+)\)\s*var\s+(\w+)\s*:\s*texture_2d<f32>;/g;
+                        let texMatch;
+                        while ((texMatch = textureBindingRegex.exec(shaderCode)) !== null) {
+                            textureBindings.push(parseInt(texMatch[1], 10));
+                        }
+
+                        // Parse sampler bindings
+                        const samplerBindingRegex = /@group\(0\)\s*@binding\((\d+)\)\s*var\s+(\w+)\s*:\s*sampler;/g;
+                        let samMatch;
+                        while ((samMatch = samplerBindingRegex.exec(shaderCode)) !== null) {
+                            samplerBindings.push(parseInt(samMatch[1], 10));
+                        }
+
+                        return { uniforms, textureBindings, samplerBindings };
+                    }
+                    
+                    function updateZoomDisplay() {
+                        zoomLevelDisplay.textContent = `${Math.round(scale * 100)}%`;
+                    }
+        
+                    function resetViewTo100Percent() {
+                        scale = 1.0;
+                        offsetX = 0;
+                        offsetY = 0;
+                        updateZoomDisplay();
+                    }
+        
+                    function fitToView() {
+                        if (!sourceImage) return;
+                        const canvas = canvasOriginal;
+                        const scaleX = canvas.clientWidth / sourceImage.naturalWidth;
+                        const scaleY = canvas.clientHeight / sourceImage.naturalHeight;
+                        scale = Math.min(scaleX, scaleY);
+                        offsetX = 0;
+                        offsetY = 0;
+                        updateZoomDisplay();
+                    }
+        
+                    function drawOriginalImage() {
+                        if (!sourceImage) return;
+                         const dpr = window.devicePixelRatio || 1;
+                        const displayWidth = canvasOriginal.clientWidth;
+                        const displayHeight = canvasOriginal.clientHeight;
+        
+                        if (canvasOriginal.width !== displayWidth * dpr || canvasOriginal.height !== displayHeight * dpr) {
+                            canvasOriginal.width = displayWidth * dpr;
+                            canvasOriginal.height = displayHeight * dpr;
+                        }
+                        ctxOriginal.clearRect(0, 0, canvasOriginal.width, canvasOriginal.height);
+                        ctxOriginal.save();
+                        ctxOriginal.scale(dpr, dpr);
+                        
+                        // Calculate position and size based on scale and offset
+                        const drawWidth = sourceImage.naturalWidth * scale;
+                        const drawHeight = sourceImage.naturalHeight * scale;
+                        const drawX = (displayWidth - drawWidth) / 2 + offsetX;
+                        const drawY = (displayHeight - drawHeight) / 2 + offsetY;
+        
+                        ctxOriginal.drawImage(sourceImage, drawX, drawY, drawWidth, drawHeight);
+                        ctxOriginal.restore();
+                    }
+        
+                    async function loadImage(url) {
+                        sourceImage = new Image();
+                        sourceImage.crossOrigin = "anonymous";
+                        sourceImage.src = url;
+                        await sourceImage.decode();
+        
+                        fitToView();
+                        
+                        const imageBitmap = await createImageBitmap(sourceImage);
+        
+                        if (sourceTexture) sourceTexture.destroy();
+                        sourceTexture = device.createTexture({
+                            label: 'sourceTexture',
+                            size: [imageBitmap.width, imageBitmap.height, 1],
+                            format: 'rgba8unorm',
+                            usage: GPUTextureUsage.TEXTURE_BINDING | GPUTextureUsage.COPY_DST | GPUTextureUsage.RENDER_ATTACHMENT,
+                        });
+
+                        // Alternative, more robust method for texture upload
+                        const tempCanvas = document.createElement('canvas');
+                        tempCanvas.width = imageBitmap.width;
+                        tempCanvas.height = imageBitmap.height;
+                        const tempCtx = tempCanvas.getContext('2d');
+                        tempCtx.drawImage(imageBitmap, 0, 0);
+                        const imageData = tempCtx.getImageData(0, 0, imageBitmap.width, imageBitmap.height);
+
+                        device.queue.writeTexture(
+                            { texture: sourceTexture },
+                            imageData.data,
+                            { bytesPerRow: imageBitmap.width * 4 },
+                            { width: imageBitmap.width, height: imageBitmap.height }
+                        );
+        
+                        pingPongTextures.forEach(t => t.destroy());
+                        pingPongTextures = [
+                            device.createTexture({
+                                label: 'pingPongTexture_0',
+                                size: [imageBitmap.width, imageBitmap.height],
+                                format: 'rgba8unorm',
+                                usage: GPUTextureUsage.TEXTURE_BINDING | GPUTextureUsage.COPY_DST | GPUTextureUsage.RENDER_ATTACHMENT,
+                            }),
+                            device.createTexture({
+                                label: 'pingPongTexture_1',
+                                size: [imageBitmap.width, imageBitmap.height],
+                                format: 'rgba8unorm',
+                                usage: GPUTextureUsage.TEXTURE_BINDING | GPUTextureUsage.COPY_DST | GPUTextureUsage.RENDER_ATTACHMENT,
+                            })
+                        ];
+                        
+                        imageBitmap.close();
+        
+                        if (!isRendering) {
+                            isRendering = true;
+                            requestAnimationFrame(render);
+                        }
+                    }
+        
+                    function handleFileSelect(evt) {
+                        const file = evt.target.files[0];
+                        if (file) {
+                            loadImage(URL.createObjectURL(file));
+                        }
+                    }
+        
+                    const canvasContainer = document.getElementById('canvas-container');
+                    canvasContainer.addEventListener('wheel', e => {
+                        e.preventDefault();
+                        const rect = canvasContainer.getBoundingClientRect();
+                        const x = e.clientX - rect.left;
+                        const y = e.clientY - rect.top;
+        
+                        const delta = e.deltaY * -0.005;
+                        const newScale = Math.max(MIN_SCALE, Math.min(MAX_SCALE, scale * (1 + delta)));
+                        
+                        const dpr = window.devicePixelRatio || 1;
+                        // Adjust offset to zoom towards the mouse pointer
+                        offsetX = (offsetX - (x - canvasContainer.clientWidth / 2)) * (newScale / scale) + (x - canvasContainer.clientWidth / 2);
+                        offsetY = (offsetY - (y - canvasContainer.clientHeight / 2)) * (newScale / scale) + (y - canvasContainer.clientHeight / 2);
+        
+                        scale = newScale;
+                        updateZoomDisplay();
+                    });
+                    canvasContainer.addEventListener('mousedown', e => {
+                        isDragging = true;
+                        lastX = e.clientX;
+                        lastY = e.clientY;
+                    });
+                    canvasContainer.addEventListener('mousemove', e => {
+                        if (!isDragging) return;
+                        offsetX += (e.clientX - lastX);
+                        offsetY += (e.clientY - lastY);
+                        lastX = e.clientX;
+                        lastY = e.clientY;
+                    });
+                    canvasContainer.addEventListener('mouseup', () => isDragging = false);
+                    canvasContainer.addEventListener('mouseleave', () => isDragging = false);
+                    
+                    let isRendering = false;
+                    
+                    const observer = new ResizeObserver(entries => {
+                        for (const entry of entries) {
+                            const canvas = entry.target;
+                            const dpr = window.devicePixelRatio || 1;
+                            const width = entry.contentBoxSize[0].inlineSize * dpr;
+                            const height = entry.contentBoxSize[0].blockSize * dpr;
+                            if(canvas.width !== width || canvas.height !== height){
+                                 presentationSize = [width, height];
+                            }
+                        }
+                    });
+                    observer.observe(canvasProcessed);
+        
+                    function init() {
+                        document.getElementById('image-loader').addEventListener('change', handleFileSelect);
+                        buildShaderLibrary();
+                        loadImage('test.png');
+                    }
+        
+            function render() {
+                if (!sourceImage || !device || !sourceTexture) { 
+                     requestAnimationFrame(render);
+                     return;
+                }
+    
+                drawOriginalImage();
+    
+                // Resize context if necessary
+                const dpr = window.devicePixelRatio || 1;
+                const newWidth = canvasProcessed.clientWidth * dpr;
+                const newHeight = canvasProcessed.clientHeight * dpr;
+                if(presentationSize[0] !== newWidth || presentationSize[1] !== newHeight){
+                    presentationSize = [newWidth, newHeight];
+                    context.configure({ device, format: presentationFormat, size: presentationSize, alphaMode: 'premultiplied' });
+                }
+    
+                let finalTexture = sourceTexture;
+                const commandEncoder = device.createCommandEncoder({ label: 'Main Command Encoder' });
+    
+                if (pipeline.length > 0) {
+                    let inputTexture = sourceTexture;
+                    for (let i = 0; i < pipeline.length; i++) {
+                        const pass = pipeline[i];
+                        const outputTexture = pingPongTextures[i % 2];
+    
+                        const passEncoder = commandEncoder.beginRenderPass({
+                            label: `passEncoder_${pass.name}`,
+                            colorAttachments: [{
+                                view: outputTexture.createView(),
+                                loadOp: 'clear',
+                                storeOp: 'store',
+                                clearValue: { r: 0.0, g: 0.0, b: 0.0, a: 1.0 },
+                            }],
+                        });
+                        
+                        const entries = [];
+                        pass.textureBindings.forEach(binding => {
+                            entries.push({ binding, resource: inputTexture.createView() });
+                        });
+                        pass.samplerBindings.forEach(binding => {
+                            entries.push({ binding, resource: sampler });
+                        });
+                        if (pass.uniforms.size > 0) {
+                            entries.push({ binding: pass.uniforms.binding, resource: { buffer: pass.uniformBuffer } });
+                        }
+    
+                        const bindGroup = device.createBindGroup({
+                            label: `bindGroup_${pass.name}`,
+                            layout: pass.pipeline.getBindGroupLayout(0),
+                            entries: entries,
+                        });
+    
+                        passEncoder.setPipeline(pass.pipeline);
+                        passEncoder.setBindGroup(0, bindGroup);
+                        passEncoder.draw(6, 1, 0, 0);
+                        passEncoder.end();
+                        inputTexture = outputTexture;
+                    }
+                    finalTexture = inputTexture;
+                }
+    
+                // Final draw to canvas with pan and zoom
+                const canvasTexture = context.getCurrentTexture();
+                const renderPassDescriptor = {
+                    colorAttachments: [{
+                        view: canvasTexture.createView(),
+                        loadOp: (pipeline.length > 0) ? 'load' : 'clear',
+                        storeOp: 'store',
+                        clearValue: { r: 0.1, g: 0.1, b: 0.1, a: 1.0 },
+                    }],
+                };
+
+                const passEncoder = commandEncoder.beginRenderPass(renderPassDescriptor);
+                passEncoder.setLabel('panZoomPassEncoder');
+                
+                const panZoomData = new Float32Array(4);
+                panZoomData[0] = scale;
+                panZoomData[1] = 0; // padding
+                panZoomData[2] = offsetX / (canvasProcessed.clientWidth || 1);
+                panZoomData[3] = offsetY / (canvasProcessed.clientHeight || 1);
+                device.queue.writeBuffer(panZoomUniformBuffer, 0, panZoomData);
+    
+                const panZoomBindGroup = device.createBindGroup({
+                    label: 'panZoomBindGroup',
+                    layout: panZoomPipeline.getBindGroupLayout(0),
+                    entries: [
+                        { binding: 0, resource: sampler },
+                        { binding: 1, resource: finalTexture.createView() },
+                        { binding: 2, resource: { buffer: panZoomUniformBuffer } },
+                    ],
+                });
+    
+                passEncoder.setPipeline(panZoomPipeline);
+                passEncoder.setBindGroup(0, panZoomBindGroup);
+                passEncoder.draw(6, 1, 0, 0);
+                passEncoder.end();
+    
+                device.queue.submit([commandEncoder.finish()]);
+    
+                requestAnimationFrame(render);
+            }        
+                    init();
+                }
+        
+                main().catch(console.error);
+            </script>    </body>
+    
+    </html>
+    
