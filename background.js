@@ -1,42 +1,46 @@
 chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
     if (request.command === 'getShaderFiles') {
-        // 在 Chrome 擴充功能中，我們無法像在 Node.js 中那樣動態掃描檔案系統。
-        // 檔案列表必須是預先知道的。作為一個解決方案，我們可以在建置時生成一個 manifest.json 或一個 JS 檔案來包含所有著色器的路徑。
-        // 當您將 wgsl 檔案加入 effects_wgsl 後，請手動更新此列表。
         const knownShaders = [
-            // "Filters/Deband.wgsl",
+            "effects_wgsl/Anime4K_Denoise_Bilateral_Median.wgsl"
             // "Sharpen/CAS.wgsl"
         ];
         
         Promise.resolve(knownShaders).then(sendResponse);
-        return true; // 表示我們將非同步地呼叫 sendResponse
+        return true;
     }
 });
 
-// 監聽擴充功能安裝事件
 chrome.runtime.onInstalled.addListener(() => {
     console.log("YouTube VSR extension installed/updated.");
-    // 設定初始儲存值
     chrome.storage.local.set({
         isEnabled: false,
         pipeline: []
     });
 });
 
-// --- 啟用/停用擴充功能圖示的核心邏輯 ---
-
-// 當分頁更新時觸發
 chrome.tabs.onUpdated.addListener((tabId, changeInfo, tab) => {
-    // 檢查分頁是否載入完成且有 URL
-    if (changeInfo.status === 'complete' && tab.url) {
-        updateActionState(tabId, tab.url);
+    // *** KEY CHANGE: 偵測 URL 的實際變化 ***
+    // 只有當 changeInfo.url 存在時，才表示分頁的 URL 發生了變化 (SPA 導航)
+    if (tab.url && tab.url.includes("youtube.com/watch")) {
+        // 如果是 URL 變化，就發送一個導航訊息
+        if (changeInfo.url) {
+            chrome.tabs.sendMessage(tabId, { command: "navigation" }).catch(err => {
+                if (!err.message.includes("Could not establish connection. Receiving end does not exist.")) {
+                    console.error("VSR SendMessage Error:", err);
+                }
+            });
+        }
+        // 無論如何，都要確保圖示狀態正確
+        chrome.action.enable(tabId);
+    } else if (tab.url) {
+        chrome.action.disable(tabId);
     }
 });
 
-// 當切換到不同分頁時觸發
+
 chrome.tabs.onActivated.addListener((activeInfo) => {
     chrome.tabs.get(activeInfo.tabId, (tab) => {
-        if (tab.url) {
+        if (tab && tab.url) {
             updateActionState(tab.id, tab.url);
         }
     });
@@ -44,12 +48,8 @@ chrome.tabs.onActivated.addListener((activeInfo) => {
 
 function updateActionState(tabId, url) {
     if (url.includes("youtube.com/watch")) {
-        // 如果是 YouTube 影片頁面，啟用圖示
         chrome.action.enable(tabId);
-        console.log(`VSR Action enabled for tab: ${tabId}`);
     } else {
-        // 否則，禁用圖示
         chrome.action.disable(tabId);
-        console.log(`VSR Action disabled for tab: ${tabId}`);
     }
 }

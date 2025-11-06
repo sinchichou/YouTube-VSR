@@ -280,7 +280,8 @@ document.addEventListener('DOMContentLoaded', () => {
         if (shaderCodeCache.has(path)) {
             return shaderCodeCache.get(path);
         }
-        const fullPath = chrome.runtime.getURL(`effects_wgsl/${path}`);
+        // The path from background.js is already the full path relative to the extension root.
+        const fullPath = chrome.runtime.getURL(path);
         const code = await fetch(fullPath).then(res => res.text());
         shaderCodeCache.set(path, code);
         return code;

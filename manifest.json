@@ -25,6 +25,13 @@
       "js": ["content.js"]
     }
   ],
+  "web_accessible_resources": [
+    {
+      "resources": ["parser.js"
+      , "effects_wgsl/*.wgsl"],
+      "matches": ["*://www.youtube.com/*"]
+    }
+  ],
   "icons": {
     "16": "icons/icon16.png",
     "48": "icons/icon48.png",
