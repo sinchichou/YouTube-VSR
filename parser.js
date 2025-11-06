@@ -47,35 +47,47 @@ const Patterns = {
 };
 
 export class ShaderParser {
+    constructor(debug = false) {
+        this.debug = debug;
+        if (this.debug) {
+            console.log("ShaderParser initialized in debug mode.");
+        }
+    }
     /**
      * Parses a shader string with custom Magpie headers.
      * @param {string} shaderCode The full shader code.
      * @returns {ShaderInfo} A structured object representing the shader.
      */
     parse(shaderCode) {
+        if (this.debug) console.log('--- Starting Shader Parsing ---');
         const lines = shaderCode.split('\n');
         const info = this._createEmptyShaderInfo();
 
         let currentState = null; // Tracks the current block (e.g., { type: 'PARAMETER', data: {} })
+        let codeBodyStartIndex = -1;
 
-        for (const line of lines) {
+        for (let i = 0; i < lines.length; i++) {
+            const line = lines[i];
             const trimmedLine = line.trim();
-            if (trimmedLine === '') continue; // Skip empty lines
+
+            if (trimmedLine === '') continue;
 
             // It's a directive line
             if (trimmedLine.startsWith('//')) {
                 const mainDirectiveMatch = trimmedLine.match(Patterns.MAIN_DIRECTIVE);
 
-                // Check if it's a MAIN directive (PARAMETER, TEXTURE, PASS, etc.)
+                // Check if it's a MAIN directive (PARAMETER, TEXTURE, SAMPLER, PASS, etc.)
                 if (mainDirectiveMatch && ['PARAMETER', 'TEXTURE', 'SAMPLER', 'PASS'].includes(mainDirectiveMatch[1])) {
                     this._commitState(currentState, info); // Commit the previous block before starting a new one
                     currentState = this._createState(mainDirectiveMatch);
+                    if (this.debug) console.log(`[Line ${i + 1}] Found main directive: ${mainDirectiveMatch[1]}`, mainDirectiveMatch[2] || '');
                 }
                 // Otherwise, it's metadata for the current block
                 else if (currentState) {
                     const metadataMatch = trimmedLine.match(Patterns.METADATA);
                     if (metadataMatch) {
                         const [, key, value] = metadataMatch;
+                        if (this.debug) console.log(`  - [Line ${i + 1}] Metadata for ${currentState.type}: ${key} = ${value}`);
                         currentState.data[key.toLowerCase()] = this._autoParseValue(value);
                     }
                 }
@@ -84,6 +96,7 @@ export class ShaderParser {
                     const metadataMatch = trimmedLine.match(Patterns.METADATA);
                     if (metadataMatch) {
                         const [, key, value] = metadataMatch;
+                        if (this.debug) console.log(`[Line ${i + 1}] Found global metadata: ${key} = ${value}`);
                         info.metadata[key.toLowerCase()] = value;
                     }
                 }
@@ -94,6 +107,7 @@ export class ShaderParser {
                 const declMatch = trimmedLine.match(Patterns.VARIABLE_DECL);
                 if (declMatch) {
                     const [, type, name] = declMatch;
+                    if (this.debug) console.log(`  - [Line ${i + 1}] Declaration for ${currentState.type}: ${type} ${name}`);
                     currentState.data.type = type;
                     currentState.data.name = name;
                     this._commitState(currentState, info);
@@ -102,10 +116,14 @@ export class ShaderParser {
                     // This could be an error or start of the code body
                     this._commitState(currentState, info);
                     currentState = null;
+                    codeBodyStartIndex = i;
+                    if (this.debug) console.log(`[Line ${i + 1}] End of header section, start of code body.`);
                     // We assume headers are finished if a non-empty, non-comment, non-declaration line is found
                     break;
                 }
             } else {
+                codeBodyStartIndex = i;
+                if (this.debug) console.log(`[Line ${i + 1}] No current state, assuming start of code body.`);
                 // First line of code body encountered
                 break;
             }
@@ -114,9 +132,16 @@ export class ShaderParser {
         // Commit any lingering state at the end of the file
         this._commitState(currentState, info);
 
-        // Simple way to find the code body: find the first non-header line
-        const headerEndIndex = shaderCode.lastIndexOf(lines.find(l => !l.trim().startsWith('//!') && l.trim() !== ''))
-        info.codeBody = headerEndIndex !== -1 ? shaderCode.substring(headerEndIndex) : '';
+        if (codeBodyStartIndex !== -1) {
+            info.codeBody = lines.slice(codeBodyStartIndex).join('\n');
+        } else {
+            info.codeBody = '';
+        }
+        
+        if (this.debug) {
+            console.log('--- Parsing Finished ---');
+            console.log('Final ShaderInfo object:', JSON.stringify(info, null, 2));
+        }
 
         return info;
     }
@@ -145,13 +170,20 @@ export class ShaderParser {
 
     _commitState(state, info) {
         if (!state) return;
+        if (this.debug) console.log('Committing state:', state);
 
         // Special handling for PASS inputs/outputs
         if (state.type === 'PASS') {
-            if (state.data.in) state.data.inputs.push(state.data.in);
-            if (state.data.out) state.data.outputs.push(state.data.out);
-            delete state.data.in; // cleanup
-            delete state.data.out; // cleanup
+            if (state.data.in) {
+                if (!Array.isArray(state.data.inputs)) state.data.inputs = [];
+                state.data.inputs.push(state.data.in);
+                delete state.data.in; // cleanup
+            }
+            if (state.data.out) {
+                if (!Array.isArray(state.data.outputs)) state.data.outputs = [];
+                state.data.outputs.push(state.data.out);
+                delete state.data.out; // cleanup
+            }
         }
 
         switch (state.type) {

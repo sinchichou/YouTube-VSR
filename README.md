@@ -242,7 +242,41 @@ function processFrame() {
 | **同步控制** | 對 `<video>` 元素的 `currentTime` 屬性進行讀取和寫入（Seek）是實現精確同步的**唯一可靠手段**。`requestVideoFrameCallback` 等 API 雖然能提供影片幀信息，但無法給予我們修正誤差所需的強制控制權。 |
 | **用戶體驗考量** | 強制 Seek (`video.currentTime = ...`) 可能會導致極其短暫的播放停頓。因此，誤差容忍度（上例中的 `0.1` 秒）需要仔細調校。一個較大的容忍度可以減少 Seek 次數，但可能在某些情況下導致短暫的失步感。建議設置一個合理的閾值，並只在誤差超過該閾值時才進行校準，例如每秒檢查一次。 |
 
-## 8. 著色器檔案類型與相容性 (Shader File Types and Compatibility)
+## 8. 測試 (Testing)
+
+本專案包含一個用於開發和驗證著色器解析器 (`parser.js`) 的測試頁面。
+
+### `test_parser.html`
+
+這是一個互動式測試工具，旨在驗證 `parser.js` 是否能正確解析帶有 Magpie 風格標頭的著色器檔案 (`.hlsl` 或 `.wgsl`)，並根據解析出的參數動態生成 UI。
+
+#### 功能
+
+1.  **著色器載入與編輯**: 
+    -   可以透過「Load .hlsl or .wgsl file」按鈕從本地載入檔案。
+    -   也可以直接在左側的文字區塊中貼上或編輯著色器程式碼。
+    -   頁面預設載入 `effects_wgsl/workspace/Anime4K_Denoise_Bilateral_Median.wgsl` 的內容。
+
+2.  **即時解析**: 
+    -   點擊 "Parse Shader" 按鈕後，`parser.js` 會執行解析，並將結構化的 `ShaderInfo` 物件以 JSON 格式顯示在右下角的「Parsed Shader Info」區塊。
+
+3.  **動態 UI 生成**:
+    -   解析成功後，頁面會讀取 `ShaderInfo.parameters` 陣列，並在「Shader Parameters」區塊為每一個參數自動生成一個帶有標籤、滑桿 (range input) 和當前值的 UI 控制項。
+    -   滑桿的 `min`, `max`, `step`, `default` 值均來自著色器標頭中的定義。
+
+4.  **圖片處理模擬**:
+    -   可以透過「Load Image」按鈕載入一張圖片，它會顯示在「Original Image」畫布上。
+    -   當參數滑桿被調整時，「Processed Image (Simulated)」畫布會展示一個模擬的處理效果（例如，根據 `intensitySigma` 參數調整亮度和灰度），這有助於直觀地驗證參數與畫面的互動。
+
+#### 如何使用
+
+1.  在瀏覽器中直接打開 `test_parser.html` 檔案。
+2.  頁面會自動載入並解析預設的 WGSL 著色器。
+3.  你可以在「Shader Parameters」區塊看到為 "Strength" (`intensitySigma`) 生成的滑桿。
+4.  載入一張圖片來觀察原始畫面和模擬的處理後畫面。
+5.  你可以修改文字區塊中的著色器程式碼，或載入其他 `.hlsl` / `.wgsl` 檔案，然後點擊 "Parse Shader" 來測試不同的解析情境。
+
+## 9. 著色器檔案類型與相容性 (Shader File Types and Compatibility)
 
 本專案主要使用 HLSL (High-Level Shading Language) 著色器，並透過 JavaScript 進行即時轉換以適應 WebGL 環境。
 
