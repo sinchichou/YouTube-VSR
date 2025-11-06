@@ -19,3 +19,4 @@ temp_shader/
 # IDE and OS specific
 .vscode/
 .DS_Store
+.vs/

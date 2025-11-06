@@ -1,5 +1,6 @@
 // YouTube VSR - WebGPU Multi-pass Engine
 (function () {
+    // 防止腳本重複注入
     if (window.vsrInjected) {
         console.log("YouTube VSR : VSR script already injected. Aborting.");
         return;
@@ -22,11 +23,13 @@
     let pingPongTextures = []; // 用於多通道渲染的紋理
     let fullscreenQuadVS = null; // 共用的頂點著色器
     let sampler = null;
+    let finalPass = null; // 用於最終繪製到畫布的管線
+    let parser = null; // ShaderParser 的實例
 
     console.log("YouTube VSR : YouTube VSR WebGPU Engine Loaded.");
 
     //================================================================================
-    // CORE LOGIC (SETUP, RENDER, CLEANUP)
+    // 核心邏輯 (設定, 渲染, 清理)
     //================================================================================
 
     async function start() {
@@ -50,12 +53,27 @@
         if (isRunning) return;
         if (!(await setupWebGPU())) return;
 
+        try {
+            const parserURL = chrome.runtime.getURL('parser.js');
+            const parserModule = await import(parserURL);
+            parser = new parserModule.ShaderParser();
+        } catch (e) {
+            console.error("YouTube VSR Error: Could not load parser.js module.", e);
+            stop();
+            return;
+        }
+
         const settings = await chrome.storage.local.get(['pipeline']);
         await buildRenderPipeline(settings.pipeline || []);
 
-        resizeObserver = new ResizeObserver(handleResize);
+        resizeObserver = new ResizeObserver(syncCanvasDimensions);
         resizeObserver.observe(videoElement);
-        handleResize(); // 初始同步尺寸
+
+        videoElement.addEventListener('resize', recreateFrameTextures);
+
+        // 首次手動觸發，確保初始狀態正確
+        syncCanvasDimensions(); // 現在這個函式會處理所有尺寸問題
+        recreateFrameTextures();
 
         videoElement.style.opacity = '0';
         isRunning = true;
@@ -67,73 +85,104 @@
         if (!isRunning) return;
         console.log("YouTube VSR : Stop command received.");
 
-        if (animationFrameId) cancelAnimationFrame(animationFrameId);
+        if (animationFrameId && videoElement) videoElement.cancelVideoFrameCallback(animationFrameId);
+
         if (resizeObserver) resizeObserver.disconnect();
+        if (videoElement) videoElement.removeEventListener('resize', recreateFrameTextures);
+
         if (canvas) canvas.remove();
         if (device) device.destroy();
         if (videoElement) videoElement.style.opacity = '1';
 
-        // Reset all state
         isRunning = false; videoElement = null; canvas = null; device = null;
         context = null; animationFrameId = null; resizeObserver = null;
-        gpuRenderables = []; pipeline = [];
+        gpuRenderables = []; pipeline = []; finalPass = null;
+        pingPongTextures.forEach(t => t.destroy());
+        pingPongTextures = [];
+        sourceTexture?.destroy();
+        sourceTexture = null;
         console.log("YouTube VSR : Capture stopped and resources cleaned up.");
     }
 
     function renderLoop() {
-        if (!isRunning) return;
+        if (!isRunning || !device || !sourceTexture || videoElement.readyState < 2 || videoElement.videoWidth === 0) {
+            if (isRunning && videoElement) {
+                animationFrameId = videoElement.requestVideoFrameCallback(renderLoop);
+            }
+            return;
+        }
 
-        if (!videoElement.paused && !videoElement.ended && videoElement.videoWidth > 0) {
-            // 將影片當前幀複製到 sourceTexture
+        try {
             device.queue.copyExternalImageToTexture(
                 { source: videoElement },
                 { texture: sourceTexture },
                 [videoElement.videoWidth, videoElement.videoHeight]
             );
+        } catch (e) {
+            if (e.name === "OperationError") {
+                console.warn("YouTube VSR: copyExternalImageToTexture failed, likely due to page navigation. Stopping.", e);
+                stop();
+            } else {
+                console.error("YouTube VSR Error:", e);
+            }
+            return;
+        }
 
-            const commandEncoder = device.createCommandEncoder({ label: 'VSR Command Encoder' });
-            let currentSource = sourceTexture;
+        const commandEncoder = device.createCommandEncoder({ label: 'VSR Command Encoder' });
+        let currentSource = sourceTexture;
 
-            // --- 執行渲染管線 ---
+        if (gpuRenderables.length > 0) {
             for (let i = 0; i < gpuRenderables.length; i++) {
                 const renderable = gpuRenderables[i];
-                const passEncoder = commandEncoder.beginRenderPass({
-                    colorAttachments: [{
-                        view: pingPongTextures[i % 2].createView(),
-                        loadOp: 'clear', storeOp: 'store',
-                        clearValue: { r: 0, g: 0, b: 0, a: 1 }
-                    }]
-                });
-                passEncoder.setPipeline(renderable.pipeline);
-                // 更新 bind group，將上一個 pass 的輸出作為輸入
-                const bindGroup = createBindGroup(renderable, currentSource);
-                passEncoder.setBindGroup(0, bindGroup);
-                passEncoder.draw(6, 1, 0, 0);
-                passEncoder.end();
-                currentSource = pingPongTextures[i % 2];
+                const destinationTexture = pingPongTextures[i % 2];
+
+                if (renderable.type === 'compute') {
+                    const passEncoder = commandEncoder.beginComputePass();
+                    passEncoder.setPipeline(renderable.pipeline);
+                    const bindGroup = createComputeBindGroup(renderable, currentSource, destinationTexture);
+                    passEncoder.setBindGroup(0, bindGroup);
+                    const blockSize = renderable.shaderInfo?.passes[0]?.metadata?.block_size || 8;
+                    const workgroupCountX = Math.ceil(videoElement.videoWidth / blockSize);
+                    const workgroupCountY = Math.ceil(videoElement.videoHeight / blockSize);
+                    passEncoder.dispatchWorkgroups(workgroupCountX, workgroupCountY);
+                    passEncoder.end();
+                } else { // 'render'
+                    const passEncoder = commandEncoder.beginRenderPass({
+                        colorAttachments: [{
+                            view: destinationTexture.createView(),
+                            loadOp: 'clear', storeOp: 'store',
+                            clearValue: { r: 0, g: 0, b: 0, a: 1 }
+                        }]
+                    });
+                    passEncoder.setPipeline(renderable.pipeline);
+                    const bindGroup = createRenderBindGroup(renderable, currentSource);
+                    passEncoder.setBindGroup(0, bindGroup);
+                    passEncoder.draw(6, 1, 0, 0);
+                    passEncoder.end();
+                }
+                currentSource = destinationTexture;
             }
-
-            // --- 將最終結果繪製到螢幕 ---
-            const finalPassEncoder = commandEncoder.beginRenderPass({
-                colorAttachments: [{
-                    view: context.getCurrentTexture().createView(),
-                    loadOp: 'clear', storeOp: 'store',
-                    clearValue: { r: 0, g: 0, b: 0, a: 1 }
-                }]
-            });
-            const finalRenderable = getFinalPassRenderable(currentSource);
-            finalPassEncoder.setPipeline(finalRenderable.pipeline);
-            finalPassEncoder.setBindGroup(0, finalRenderable.bindGroup);
-            finalPassEncoder.draw(6, 1, 0, 0);
-            finalPassEncoder.end();
-
-            device.queue.submit([commandEncoder.finish()]);
         }
-        animationFrameId = requestAnimationFrame(renderLoop);
+
+        const finalPassEncoder = commandEncoder.beginRenderPass({
+            colorAttachments: [{
+                view: context.getCurrentTexture().createView(),
+                loadOp: 'clear', storeOp: 'store',
+                clearValue: { r: 0, g: 0, b: 0, a: 1 }
+            }]
+        });
+        const finalRenderable = getFinalPassRenderable(currentSource);
+        finalPassEncoder.setPipeline(finalRenderable.pipeline);
+        finalPassEncoder.setBindGroup(0, finalRenderable.bindGroup);
+        finalPassEncoder.draw(4, 1, 0, 0);
+        finalPassEncoder.end();
+
+        device.queue.submit([commandEncoder.finish()]);
+        animationFrameId = videoElement.requestVideoFrameCallback(renderLoop);
     }
 
     //================================================================================
-    // WEBGPU SETUP & PIPELINE BUILDING
+    // WEBGPU 設定 & 管線建立
     //================================================================================
 
     async function setupWebGPU() {
@@ -143,15 +192,21 @@
             if (!adapter) throw new Error("No GPU adapter found.");
             device = await adapter.requestDevice();
 
+            device.lost.then(info => {
+                console.error(`WebGPU device was lost: ${info.message}`);
+                if (info.reason !== 'destroyed') stop();
+            });
+
             canvas = document.createElement('canvas');
             const playerContainer = document.querySelector('.html5-video-player');
             playerContainer.appendChild(canvas);
+
             context = canvas.getContext('webgpu');
             const presentationFormat = navigator.gpu.getPreferredCanvasFormat();
             context.configure({ device, format: presentationFormat, alphaMode: 'premultiplied' });
 
             fullscreenQuadVS = device.createShaderModule({
-                label: 'Fullscreen Quad VS',
+                label: 'Fullscreen Triangle VS',
                 code: `@vertex fn main(@builtin(vertex_index) vi: u32) -> @builtin(position) vec4<f32> {
                     let pos = array<vec2<f32>, 6>(vec2(-1,-1),vec2(1,-1),vec2(-1,1),vec2(-1,1),vec2(1,-1),vec2(1,1));
                     return vec4<f32>(pos[vi], 0.0, 1.0);
@@ -160,109 +215,151 @@
             sampler = device.createSampler({ magFilter: 'linear', minFilter: 'linear' });
             return true;
         } catch (e) {
-            console.error("YouTube VSR Error: VSR WebGPU setup failed:", e);
+            console.error("YouTube VSR Error: WebGPU setup failed:", e);
             stop();
             return false;
         }
     }
 
     async function buildRenderPipeline(newPipeline) {
-        if (!device) return;
+        if (!device || !parser) return;
         pipeline = newPipeline || [];
         gpuRenderables = [];
 
         for (const step of pipeline) {
             try {
-                const code = await loadShaderCode(step.path);
-                const fsModule = device.createShaderModule({ label: step.path, code });
+                const fullCode = await loadShaderCode(step.path);
+                const shaderInfo = parser.parse(fullCode);
+                const fsModule = device.createShaderModule({ label: step.path, code: shaderInfo.codeBody });
+
                 const compilationInfo = await fsModule.getCompilationInfo();
                 if (compilationInfo.messages.some(m => m.type === 'error')) {
                     console.error(`Error compiling ${step.path}:`, compilationInfo.messages);
-                    continue; // 跳過這個著色器
+                    continue;
                 }
 
-                const renderPipeline = device.createRenderPipeline({
-                    label: `Pipeline - ${step.path}`,
-                    layout: 'auto',
-                    vertex: { module: fullscreenQuadVS, entryPoint: 'main' },
-                    fragment: { module: fsModule, entryPoint: 'main', targets: [{ format: 'rgba8unorm' }] }
-                });
+                let stepPipeline;
+                const isCompute = shaderInfo.codeBody.includes('@compute');
 
-                const { uniforms } = parseUniforms(code); // 與 popup.js 中相同的解析邏輯
+                if (isCompute) {
+                    stepPipeline = await device.createComputePipelineAsync({
+                        label: `Pipeline (Compute) - ${step.path}`,
+                        layout: 'auto',
+                        compute: { module: fsModule, entryPoint: 'main' }
+                    });
+                } else {
+                    stepPipeline = await device.createRenderPipelineAsync({
+                        label: `Pipeline (Render) - ${step.path}`,
+                        layout: 'auto',
+                        vertex: { module: fullscreenQuadVS, entryPoint: 'main' },
+                        fragment: { module: fsModule, entryPoint: 'main', targets: [{ format: 'rgba8unorm' }] }
+                    });
+                }
+
                 let uniformBuffer = null;
-                if (uniforms.size > 0) {
+                const uniformBufferSize = shaderInfo.parameters.length * 4;
+                if (uniformBufferSize > 0) {
                     uniformBuffer = device.createBuffer({
                         label: `Uniforms - ${step.path}`,
-                        size: uniforms.size,
+                        size: Math.max(16, uniformBufferSize),
                         usage: GPUBufferUsage.UNIFORM | GPUBufferUsage.COPY_DST,
                     });
-                    // 寫入初始/儲存的參數值
-                    updateUniformBuffer(uniformBuffer, uniforms, step.params);
+                    updateUniformBuffer(uniformBuffer, shaderInfo.parameters, step.params);
                 }
 
-                gpuRenderables.push({ 
-                    instanceId: step.instanceId, 
-                    pipeline: renderPipeline, 
-                    uniforms, 
-                    uniformBuffer 
+                gpuRenderables.push({
+                    instanceId: step.instanceId,
+                    pipeline: stepPipeline,
+                    type: isCompute ? 'compute' : 'render',
+                    shaderInfo: shaderInfo,
+                    parameters: shaderInfo.parameters,
+                    uniformBuffer,
+                    params: step.params
                 });
             } catch (e) {
                 console.error(`Failed to build pipeline for ${step.path}:`, e);
             }
         }
-        console.log(`VSR: Built ${gpuRenderables.length} renderable steps.`);
-        recreateFrameTextures();
+        console.log(`YouTube VSR : Built ${gpuRenderables.length} renderable steps.`);
     }
 
-    function createBindGroup(renderable, texture) {
-        const entries = [{ binding: 0, resource: sampler }, { binding: 1, resource: texture.createView() }];
-        if (renderable.uniformBuffer) {
-            entries.push({ binding: renderable.uniforms.binding, resource: { buffer: renderable.uniformBuffer } });
-        }
-        return device.createBindGroup({
-            layout: renderable.pipeline.getBindGroupLayout(0),
-            entries: entries
-        });
+    function createComputeBindGroup(renderable, sourceTexture, destinationTexture) {
+        const entries = [];
+        if (renderable.uniformBuffer) entries.push({ binding: 0, resource: { buffer: renderable.uniformBuffer } });
+        entries.push({ binding: 1, resource: sourceTexture.createView() });
+        entries.push({ binding: 2, resource: destinationTexture.createView() });
+        entries.push({ binding: 3, resource: sampler });
+
+        return device.createBindGroup({ layout: renderable.pipeline.getBindGroupLayout(0), entries: entries });
     }
-    
-    // 為了將最終結果繪製到 canvas，需要一個簡單的 passthrough pipeline
-    let finalPass = null;
+
+    function createRenderBindGroup(renderable, sourceTexture) {
+        const entries = [];
+        if (renderable.uniformBuffer) entries.push({ binding: 0, resource: { buffer: renderable.uniformBuffer } });
+        entries.push({ binding: 1, resource: sourceTexture.createView() });
+        entries.push({ binding: 3, resource: sampler });
+
+        return device.createBindGroup({ layout: renderable.pipeline.getBindGroupLayout(0), entries: entries });
+    }
+
     function getFinalPassRenderable(texture) {
         if (!finalPass) {
-            const fsModule = device.createShaderModule({
-                label: 'Final Pass FS',
-                code: `@group(0) @binding(0) var s: sampler; @group(0) @binding(1) var t: texture_2d<f32>;
-                       @fragment fn main(@builtin(position) p: vec4<f32>) -> @location(0) vec4<f32> {
-                           return textureSample(t, s, p.xy / vec2<f32>(1920, 1080)); // TODO: Use actual resolution
-                       }`
+            const shaderModule = device.createShaderModule({
+                label: 'Final Pass Shader',
+                code: `
+                    struct VertexOutput { @builtin(position) position: vec4<f32>, @location(0) uv: vec2<f32> };
+                    @vertex fn vs_main(@builtin(vertex_index) vi: u32) -> VertexOutput {
+                        let x = f32((vi << 1u) & 2u) - 1.0; let y = f32(vi & 2u) - 1.0;
+                        var o: VertexOutput; o.position = vec4<f32>(x, y, 0.0, 1.0); o.uv = vec2<f32>(x*0.5+0.5, -y*0.5+0.5); return o;
+                    }
+                    @group(0)@binding(0) var s: sampler; @group(0)@binding(1) var t: texture_2d<f32>;
+                    @fragment fn fs_main(@location(0) uv: vec2<f32>) -> @location(0) vec4<f32> { return textureSample(t, s, uv); }
+                `,
             });
             const pipeline = device.createRenderPipeline({
-                layout: 'auto',
-                vertex: { module: fullscreenQuadVS, entryPoint: 'main' },
-                fragment: { module: fsModule, entryPoint: 'main', targets: [{ format: navigator.gpu.getPreferredCanvasFormat() }] }
+                label: 'Final Pass Pipeline', layout: 'auto',
+                vertex: { module: shaderModule, entryPoint: 'vs_main' },
+                fragment: { module: shaderModule, entryPoint: 'fs_main', targets: [{ format: navigator.gpu.getPreferredCanvasFormat() }] },
+                primitive: { topology: 'triangle-strip' },
             });
             finalPass = { pipeline };
         }
-        finalPass.bindGroup = device.createBindGroup({ layout: finalPass.pipeline.getBindGroupLayout(0), entries: [{binding: 0, resource: sampler}, {binding: 1, resource: texture.createView()}] });
+        finalPass.bindGroup = device.createBindGroup({
+            layout: finalPass.pipeline.getBindGroupLayout(0),
+            entries: [{ binding: 0, resource: sampler }, { binding: 1, resource: texture.createView() }]
+        });
         return finalPass;
     }
 
     //================================================================================
-    // UTILITY & EVENT HANDLERS
+    // 工具 & 事件處理
     //================================================================================
 
-    function handleResize() {
-        if (!isRunning) return;
+    /**
+     * *** KEY CHANGE: 更新此函式以同步畫布的兩種尺寸 ***
+     * 現在它會設定繪圖緩衝區大小(canvas.width/height)和CSS顯示大小(style.width/height)
+     */
+    function syncCanvasDimensions() {
+        if (!isRunning || !videoElement || !canvas) return;
+
         const dpr = window.devicePixelRatio || 1;
         const newWidth = Math.round(videoElement.clientWidth * dpr);
         const newHeight = Math.round(videoElement.clientHeight * dpr);
-        canvas.width = newWidth;
-        canvas.height = newHeight;
-        
+
+        // 僅在尺寸實際改變時才更新，以避免不必要的重繪和資源消耗
+        if (canvas.width !== newWidth || canvas.height !== newHeight) {
+            canvas.width = newWidth;
+            canvas.height = newHeight;
+            console.log(`YouTube VSR : Canvas render buffer resized to ${newWidth}x${newHeight} (DPR: ${dpr})`);
+        }
+
+        // 同時更新 CSS 樣式以確保視覺覆蓋正確
         const computedStyle = getComputedStyle(videoElement);
-        Object.assign(canvas.style, { width: computedStyle.width, height: computedStyle.height, top: computedStyle.top, left: computedStyle.left, position: 'absolute', zIndex: '10' });
-        
-        recreateFrameTextures();
+        Object.assign(canvas.style, {
+            width: computedStyle.width, height: computedStyle.height,
+            top: computedStyle.top, left: computedStyle.left,
+            position: 'absolute', zIndex: '10'
+        });
     }
 
     function recreateFrameTextures() {
@@ -270,21 +367,28 @@
         const width = videoElement.videoWidth;
         const height = videoElement.videoHeight;
 
+        if (sourceTexture && sourceTexture.width === width && sourceTexture.height === height) return;
+
         sourceTexture?.destroy();
-        sourceTexture = device.createTexture({ size: [width, height], format: 'rgba8unorm', usage: GPUTextureUsage.TEXTURE_BINDING | GPUTextureUsage.COPY_DST });
+        sourceTexture = device.createTexture({
+            size: [width, height], format: 'rgba8unorm',
+            usage: GPUTextureUsage.TEXTURE_BINDING | GPUTextureUsage.COPY_DST | GPUTextureUsage.RENDER_ATTACHMENT
+        });
 
         pingPongTextures.forEach(t => t.destroy());
         pingPongTextures = [
-            device.createTexture({ size: [width, height], format: 'rgba8unorm', usage: GPUTextureUsage.TEXTURE_BINDING | GPUTextureUsage.RENDER_ATTACHMENT }),
-            device.createTexture({ size: [width, height], format: 'rgba8unorm', usage: GPUTextureUsage.TEXTURE_BINDING | GPUTextureUsage.RENDER_ATTACHMENT })
+            device.createTexture({ size: [width, height], format: 'rgba8unorm', usage: GPUTextureUsage.TEXTURE_BINDING | GPUTextureUsage.RENDER_ATTACHMENT | GPUTextureUsage.STORAGE_BINDING }),
+            device.createTexture({ size: [width, height], format: 'rgba8unorm', usage: GPUTextureUsage.TEXTURE_BINDING | GPUTextureUsage.RENDER_ATTACHMENT | GPUTextureUsage.STORAGE_BINDING })
         ];
+        console.log(`YouTube VSR : Recreated textures for new resolution: ${width}x${height}`);
     }
 
-    function updateUniformBuffer(buffer, uniforms, params) {
-        const data = new Float32Array(uniforms.size / 4);
-        Object.values(uniforms.properties).forEach(prop => {
-            const value = params[prop.name] !== undefined ? params[prop.name] : prop.value;
-            data[prop.offset / 4] = value;
+    function updateUniformBuffer(buffer, parameters, storedParams) {
+        if (!parameters || parameters.length === 0) return;
+        const data = new Float32Array(parameters.length);
+        parameters.forEach((param, i) => {
+            const value = storedParams[param.name] !== undefined ? storedParams[param.name] : param.default;
+            data[i] = value;
         });
         device.queue.writeBuffer(buffer, 0, data);
     }
@@ -292,16 +396,16 @@
     const shaderCodeCache = new Map();
     async function loadShaderCode(path) {
         if (shaderCodeCache.has(path)) return shaderCodeCache.get(path);
-        const fullPath = chrome.runtime.getURL(`effects_wgsl/${path}`);
-        const code = await fetch(fullPath).then(res => res.text());
+        const fullPath = chrome.runtime.getURL(path);
+        const response = await fetch(fullPath);
+        if (!response.ok) throw new Error(`Shader not found at ${path} (${response.status})`);
+        const code = await response.text();
         shaderCodeCache.set(path, code);
         return code;
     }
 
-    function parseUniforms(shaderCode) { /* ... 和 popup.js 相同的解析邏輯 ... */ return { uniforms: { properties: {}, size: 0, binding: -1 } }; }
-
     //================================================================================
-    // MESSAGE LISTENER
+    // 訊息監聽器
     //================================================================================
 
     chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
@@ -317,19 +421,35 @@
             case 'updateParameter':
                 const renderable = gpuRenderables.find(r => r.instanceId === request.instanceId);
                 if (renderable && renderable.uniformBuffer) {
-                    const params = { [request.paramName]: request.value };
-                    updateUniformBuffer(renderable.uniformBuffer, renderable.uniforms, params);
+                    renderable.params[request.paramName] = request.value;
+                    updateUniformBuffer(renderable.uniformBuffer, renderable.parameters, renderable.params);
                 }
+                break;
+
+            // *** NEW: 處理來自 background.js 的導航事件 ***
+            case 'navigation':
+                console.log('YouTube VSR: Navigation detected. Re-initializing...');
+                // 先停止當前的實例來清理所有資源
+                if (isRunning) {
+                    stop();
+                }
+                // 使用一個小延遲來確保 YouTube 的 DOM 已經更新完畢，新的 <video> 元素已經可用
+                setTimeout(() => {
+                    // 只有在擴充功能是啟用狀態時才自動重啟
+                    chrome.storage.local.get('isEnabled', (result) => {
+                        if (result.isEnabled) {
+                            start();
+                        }
+                    });
+                }, 1000); // 1 秒的延遲通常足夠
                 break;
         }
         return isAsync;
     });
 
-    // 自動根據儲存的狀態決定是否啟動
     chrome.storage.local.get('isEnabled', (result) => {
         if (result.isEnabled) {
-            // 延遲一點啟動，給頁面足夠的載入時間
-            setTimeout(start, 1000);
+            setTimeout(start, 1500);
         }
     });
 })();

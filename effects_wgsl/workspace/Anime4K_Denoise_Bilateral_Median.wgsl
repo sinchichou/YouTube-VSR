@@ -29,7 +29,6 @@ SamplerState sam;
 //!BLOCK_SIZE 8 // 翻譯為 @workgroup_size(8, 8)
 //!NUM_THREADS 64
 
-// --- 寫死的資源綁定 (供第一階段原型驗證) ---
 struct Params {
     intensitySigma: f32,
 };

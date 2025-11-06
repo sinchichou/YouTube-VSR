@@ -3,7 +3,7 @@
 
 //!MAGPIE EFFECT
 //!VERSION 4
-//!SORT_NAME ㄥ_3D_Upscale_1
+//!SORT_NAME Anime4K_3DGraphics_AA_Upscale_x2_US
 //!USE MulAdd
 //!CAPABILITY FP16
 
