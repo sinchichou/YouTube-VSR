@@ -142,7 +142,7 @@
             );
         } catch (e) {
             if (e.name === "OperationError") {
-                console.warn("YouTube VSR: copyExternalImageToTexture 失敗，可能因為頁面導航。正在停止。", e);
+                console.warn("YouTube VSR : copyExternalImageToTexture 失敗，可能因為頁面導航。正在停止。", e);
                 stop();
             } else {
                 console.error("YouTube VSR 錯誤：", e);
@@ -512,7 +512,7 @@
 
             // 處理來自 background.js 的導航事件
             case 'navigation':
-                console.log('YouTube VSR: 偵測到導航，重新初始化...');
+                console.log('YouTube VSR : 偵測到導航，重新初始化...');
                 // 先停止當前的實例來清理所有資源
                 if (isRunning) {
                     stop();
