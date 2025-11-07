@@ -54,7 +54,7 @@
         if (!(await setupWebGPU())) return;
 
         try {
-            const parserURL = chrome.runtime.getURL('parser.js');
+            const parserURL = chrome.runtime.getURL('wgfx/parser.js');
             const parserModule = await import(parserURL);
             parser = new parserModule.ShaderParser();
         } catch (e) {

@@ -27,7 +27,8 @@
   ],
   "web_accessible_resources": [
     {
-      "resources": ["parser.js"
+      "resources": [
+        "wgfx/parser.js"
       , "effects_wgsl/*.wgsl"],
       "matches": ["*://www.youtube.com/*"]
     }
