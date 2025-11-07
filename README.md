@@ -9,6 +9,7 @@ This is a browser extension designed to apply real-time shaders and effects to o
 - **Customizable Effects**: Each shader's parameters can be adjusted through a user-friendly interface.
 - **wgsl Support**: Dynamically parses and applies shaders written in wgsl.
 - **Modular Design**: Easily extendable with new shaders.
+- **Video Playback Monitoring**: Detects when a video has ended playback.
 
 ---
 
@@ -93,6 +94,7 @@ This directory is intended for shaders written in WGSL (WebGPU Shading Language)
 -   **可自訂的效果**：每個著色器的參數都可以透過使用者友好的介面進行調整。
 -   **支援 wgsl**：能夠動態解析和套用以 wgsl 編寫的著色器。
 -   **模組化設計**：可以輕鬆地透過添加新的著色器來擴充功能。
+- **影片播放監測**：偵測影片播放結束。
 
 ---
 
