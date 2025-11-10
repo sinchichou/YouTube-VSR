@@ -3,7 +3,8 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
     // 如果請求是獲取著色器文件列表
     if (request.command === 'getShaderFiles') {
         const knownShaders = [
-            "effects_wgsl/Anime4K_Denoise_Bilateral_Median.wgsl"
+            "effects_wgsl/Anime4K/Anime4K_Denoise_Bilateral_Median.wgsl",
+            "effects_wgsl/Anime4K/Anime4K_Restore_Soft_UL.wgsl"
             // "Sharpen/CAS.wgsl"
         ];
 

@@ -27,10 +27,14 @@
   ],
   "web_accessible_resources": [
     {
+      "matches": [
+        "*://www.youtube.com/*",
+        "*://www.twitch.tv/*"
+      ],
       "resources": [
-        "wgfx/parser.js"
-      , "effects_wgsl/*.wgsl"],
-      "matches": ["*://www.youtube.com/*"]
+        "wgfx/parser.js",
+        "effects_wgsl/*.wgsl"
+      ]
     }
   ],
   "icons": {

@@ -1,3 +1,4 @@
+// Anime4K_Denoise_Bilateral_Median
 // 移植自 https://github.com/bloc97/Anime4K/blob/master/glsl/Denoise/Anime4K_Denoise_Bilateral_Median.glsl
 
 //!Magpie-Web EFFECT

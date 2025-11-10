@@ -8,6 +8,9 @@ compiler/
 # Compiled shaders
 shader/**/*.spv
 
+# Compiler
+compiler/dxc_2025_07_14
+
 # Local test files
 temp_test/
 temp_shader/
@@ -20,3 +23,4 @@ temp_shader/
 .vscode/
 .DS_Store
 .vs/
+.idea

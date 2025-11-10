@@ -121,9 +121,19 @@
             margin-top: 10px;
         }
 
-        #zoom-container-wrapper { display: none; }
-        #zoom-container { display: flex; gap: 20px; }
-        #zoom-original, #zoom-processed { border: 2px solid #007aff; }
+        #zoom-container-wrapper {
+            display: none;
+        }
+
+        #zoom-container {
+            display: flex;
+            gap: 20px;
+        }
+
+        #zoom-original,
+        #zoom-processed {
+            border: 2px solid #007aff;
+        }
     </style>
 </head>
 
@@ -181,7 +191,7 @@
     </div>
 
     <script type="module">
-        import { ShaderParser } from './parser.js';
+        import {ShaderParser} from '../wgfx/parser.js';
 
         // --- DOM Elements ---
         const shaderCodeEl = document.getElementById('shader-code');
@@ -208,21 +218,21 @@
 
         // --- Default Shader ---
         shaderCodeEl.value = `// 移植自 https://github.com/bloc97/Anime4K/blob/master/glsl/Denoise/Anime4K_Denoise_Bilateral_Median.glsl\n` +
-`\n//!Magpie-Web EFFECT\n//!VERSION 1\n` +
-`\n//!PARAMETER\n//!LABEL Strength\n//!DEFAULT 0.1\n//!MIN 0.01\n//!MAX 5\n//!STEP 0.01\nfloat intensitySigma;\n` +
-`\n//!TEXTURE\nTexture2D INPUT;\n` +
-`\n//!TEXTURE\n//!WIDTH INPUT_WIDTH\n//!HEIGHT INPUT_HEIGHT\nTexture2D OUTPUT;\n` +
-`\n//!SAMPLER\n//!FILTER POINT\nSamplerState sam;\n` +
-`\n//!PASS 1\n//!IN INPUT\n//!OUT OUTPUT\n//!BLOCK_SIZE 8\n` +
-`\n// --- 綁定佈局假設 (convention) ---\n// @group(0) @binding(0): Uniform Buffer (for all parameters)\n// @group(0) @binding(1): Input Texture (INPUT)\n// @group(0) @binding(2): Output Texture (OUTPUT) - must be rgba8unorm for storage\n// @group(0) @binding(3): Sampler (sam)\n` +
-`\nstruct Params {\n    intensitySigma: f32,\n};\n` +
-`\n@group(0) @binding(0) var<uniform> params: Params;\n@group(0) @binding(1) var INPUT: texture_2d<f32>;\n@group(0) @binding(2) var OUTPUT: texture_storage_2d<rgba8unorm, write>;\n@group(0) @binding(3) var sam: sampler;\n` +
-`\nconst SPATIAL_SIGMA: f32 = 1.0;\nconst KERNELSIZE: u32 = 3u;\nconst KERNELHALFSIZE: i32 = i32(KERNELSIZE / 2u);\nconst KERNELLEN: u32 = KERNELSIZE * KERNELSIZE;\n` +
-`\nfn get_offset(i: u32) -> vec2<i32> {\n    return vec2<i32>(i32(i % KERNELSIZE) - KERNELHALFSIZE, i32(i / KERNELSIZE) - KERNELHALFSIZE);\n}\n` +
-`\nfn get_luma(rgb: vec3<f32>) -> f32 {\n    return dot(vec3<f32>(0.299, 0.587, 0.114), rgb);\n}\n` +
-`\nfn gaussian(x: f32, s: f32, m: f32) -> f32 {\n    let scaled = (x - m) / s;\n    return exp(-0.5 * scaled * scaled);\n}\n` +
-`\nfn getMedian(v: ptr<function, array<vec3<f32>, KERNELLEN>>, w: ptr<function, array<f32, KERNELLEN>>, n: f32) -> vec3<f32> {\n    var result = vec3<f32>(0.0, 0.0, 0.0);\n    for (var i: u32 = 0u; i < KERNELLEN; i = i + 1u) {\n        var w_above: f32 = 0.0;\n        var w_below: f32 = 0.0;\n        for (var j: u32 = 0u; j < KERNELLEN; j = j + 1u) {\n            if ((*v)[j].x > (*v)[i].x) {\n                w_above = w_above + (*w)[j];\n            } else if ((*v)[j].x < (*v)[i].x) {\n                w_below = w_below + (*w)[j];\n            }\n        }\n        if ((n - w_above) / n >= 0.5 && w_below / n <= 0.5) {\n            result = (*v)[i];\n            break;\n        }\n    }\n    return result;\n}\n` +
-`\n@compute @workgroup_size(8, 8, 1)\nfn main(@builtin(global_invocation_id) global_id: vec3<u32>) {\n    let gxy = global_id.xy;\n    let outputSize = vec2<u32>(textureDimensions(OUTPUT));\n    if (gxy.x >= outputSize.x || gxy.y >= outputSize.y) { return; }\n\n    let inputSize = vec2<f32>(textureDimensions(INPUT));\n    let inputPt = 1.0 / inputSize;\n    let pos = (vec2<f32>(gxy) + 0.5) * inputPt;\n\n    var histogram_v: array<vec3<f32>, KERNELLEN>;\n    var histogram_l: array<f32, KERNELLEN>;\n    var histogram_w: array<f32, KERNELLEN>;\n    var n: f32 = 0.0;\n\n    let vc = get_luma(textureSampleLevel(INPUT, sam, pos, 0.0).rgb);\n    let is = pow(vc + 0.0001, 1.0) * params.intensitySigma;\n    let ss = SPATIAL_SIGMA;\n\n    for (var i: u32 = 0u; i < KERNELLEN; i = i + 1u) {\n        let ipos = get_offset(i);\n        histogram_v[i] = textureSampleLevel(INPUT, sam, pos + vec2<f32>(ipos) * inputPt, 0.0).rgb;\n        histogram_l[i] = get_luma(histogram_v[i]);\n        histogram_w[i] = gaussian(histogram_l[i], is, vc) * gaussian(length(vec2<f32>(ipos)), ss, 0.0);\n        n = n + histogram_w[i];\n    }\n    \n    textureStore(OUTPUT, gxy, vec4<f32>(getMedian(&histogram_v, &histogram_w, n), 1.0));\n}`;
+            `\n//!Magpie-Web EFFECT\n//!VERSION 1\n` +
+            `\n//!PARAMETER\n//!LABEL Strength\n//!DEFAULT 0.1\n//!MIN 0.01\n//!MAX 5\n//!STEP 0.01\nfloat intensitySigma;\n` +
+            `\n//!TEXTURE\nTexture2D INPUT;\n` +
+            `\n//!TEXTURE\n//!WIDTH INPUT_WIDTH\n//!HEIGHT INPUT_HEIGHT\nTexture2D OUTPUT;\n` +
+            `\n//!SAMPLER\n//!FILTER POINT\nSamplerState sam;\n` +
+            `\n//!PASS 1\n//!IN INPUT\n//!OUT OUTPUT\n//!BLOCK_SIZE 8\n` +
+            `\n// --- 綁定佈局假設 (convention) ---\n// @group(0) @binding(0): Uniform Buffer (for all parameters)\n// @group(0) @binding(1): Input Texture (INPUT)\n// @group(0) @binding(2): Output Texture (OUTPUT) - must be rgba8unorm for storage\n// @group(0) @binding(3): Sampler (sam)\n` +
+            `\nstruct Params {\n    intensitySigma: f32,\n};\n` +
+            `\n@group(0) @binding(0) var<uniform> params: Params;\n@group(0) @binding(1) var INPUT: texture_2d<f32>;\n@group(0) @binding(2) var OUTPUT: texture_storage_2d<rgba8unorm, write>;\n@group(0) @binding(3) var sam: sampler;\n` +
+            `\nconst SPATIAL_SIGMA: f32 = 1.0;\nconst KERNELSIZE: u32 = 3u;\nconst KERNELHALFSIZE: i32 = i32(KERNELSIZE / 2u);\nconst KERNELLEN: u32 = KERNELSIZE * KERNELSIZE;\n` +
+            `\nfn get_offset(i: u32) -> vec2<i32> {\n    return vec2<i32>(i32(i % KERNELSIZE) - KERNELHALFSIZE, i32(i / KERNELSIZE) - KERNELHALFSIZE);\n}\n` +
+            `\nfn get_luma(rgb: vec3<f32>) -> f32 {\n    return dot(vec3<f32>(0.299, 0.587, 0.114), rgb);\n}\n` +
+            `\nfn gaussian(x: f32, s: f32, m: f32) -> f32 {\n    let scaled = (x - m) / s;\n    return exp(-0.5 * scaled * scaled);\n}\n` +
+            `\nfn getMedian(v: ptr<function, array<vec3<f32>, KERNELLEN>>, w: ptr<function, array<f32, KERNELLEN>>, n: f32) -> vec3<f32> {\n    var result = vec3<f32>(0.0, 0.0, 0.0);\n    for (var i: u32 = 0u; i < KERNELLEN; i = i + 1u) {\n        var w_above: f32 = 0.0;\n        var w_below: f32 = 0.0;\n        for (var j: u32 = 0u; j < KERNELLEN; j = j + 1u) {\n            if ((*v)[j].x > (*v)[i].x) {\n                w_above = w_above + (*w)[j];\n            } else if ((*v)[j].x < (*v)[i].x) {\n                w_below = w_below + (*w)[j];\n            }\n        }\n        if ((n - w_above) / n >= 0.5 && w_below / n <= 0.5) {\n            result = (*v)[i];\n            break;\n        }\n    }\n    return result;\n}\n` +
+            `\n@compute @workgroup_size(8, 8, 1)\nfn main(@builtin(global_invocation_id) global_id: vec3<u32>) {\n    let gxy = global_id.xy;\n    let outputSize = vec2<u32>(textureDimensions(OUTPUT));\n    if (gxy.x >= outputSize.x || gxy.y >= outputSize.y) { return; }\n\n    let inputSize = vec2<f32>(textureDimensions(INPUT));\n    let inputPt = 1.0 / inputSize;\n    let pos = (vec2<f32>(gxy) + 0.5) * inputPt;\n\n    var histogram_v: array<vec3<f32>, KERNELLEN>;\n    var histogram_l: array<f32, KERNELLEN>;\n    var histogram_w: array<f32, KERNELLEN>;\n    var n: f32 = 0.0;\n\n    let vc = get_luma(textureSampleLevel(INPUT, sam, pos, 0.0).rgb);\n    let is = pow(vc + 0.0001, 1.0) * params.intensitySigma;\n    let ss = SPATIAL_SIGMA;\n\n    for (var i: u32 = 0u; i < KERNELLEN; i = i + 1u) {\n        let ipos = get_offset(i);\n        histogram_v[i] = textureSampleLevel(INPUT, sam, pos + vec2<f32>(ipos) * inputPt, 0.0).rgb;\n        histogram_l[i] = get_luma(histogram_v[i]);\n        histogram_w[i] = gaussian(histogram_l[i], is, vc) * gaussian(length(vec2<f32>(ipos)), ss, 0.0);\n        n = n + histogram_w[i];\n    }\n    \n    textureStore(OUTPUT, gxy, vec4<f32>(getMedian(&histogram_v, &histogram_w, n), 1.0));\n}`;
 
         // --- Main Initialization ---
         async function initialize() {
@@ -329,7 +339,7 @@
                 layout: device.createPipelineLayout({ bindGroupLayouts: [computeBindGroupLayout] }),
                 compute: {
                     module: device.createShaderModule({ code: shaderInfo.codeBody }),
-                    entryPoint: 'main'
+                    entryPoint: 'Pass1'
                 },
             });
 
@@ -522,7 +532,7 @@
             // Draw magnified views
             zoomOriginalCtx.clearRect(0, 0, LOUPE_SIZE, LOUPE_SIZE);
             zoomOriginalCtx.drawImage(canvasOriginal, sourceX, sourceY, sourceSize, sourceSize, 0, 0, LOUPE_SIZE, LOUPE_SIZE);
-            
+
             zoomProcessedCtx.clearRect(0, 0, LOUPE_SIZE, LOUPE_SIZE);
             zoomProcessedCtx.drawImage(canvasProcessed, sourceX, sourceY, sourceSize, sourceSize, 0, 0, LOUPE_SIZE, LOUPE_SIZE);
 
@@ -542,7 +552,7 @@
             canvasOriginal.addEventListener('mouseleave', () => {
                 zoomWrapper.style.display = 'none';
                 // Redraw original canvas to clear the red box
-                if(originalImage) ctxOriginal.drawImage(originalImage, 0, 0);
+                if (originalImage) ctxOriginal.drawImage(originalImage, 0, 0);
             });
         }
 
