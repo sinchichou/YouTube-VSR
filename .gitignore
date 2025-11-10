@@ -5,6 +5,9 @@
 compiler/
 *.zip
 
+# Modules WGFX
+WGFX/
+
 # Compiled shaders
 shader/**/*.spv
 
@@ -24,3 +27,4 @@ temp_shader/
 .DS_Store
 .vs/
 .idea/
+/wgfx/
