@@ -21,7 +21,10 @@
   },
   "content_scripts": [
     {
-      "matches": ["*://www.youtube.com/watch*"],
+      "matches": [
+        "*://www.youtube.com/watch*",
+        "*://www.twitch.tv/*"
+      ],
       "js": ["content.js"]
     }
   ],
@@ -32,8 +35,8 @@
         "*://www.twitch.tv/*"
       ],
       "resources": [
-        "wgfx/parser.js",
-        "effects_wgsl/*.wgsl"
+        "wgfx.browser.esm.js",
+        "effects_wgsl/**/*.wgsl"
       ]
     }
   ],

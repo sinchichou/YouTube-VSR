@@ -5,119 +5,444 @@
     <title>YouTube VSR 控制面板</title>
     <style>
         :root {
-            --bg-color: #282c34;
-            --panel-bg-color: #21252b;
-            --text-color: #abb2bf;
-            --header-color: #61afef;
-            --border-color: #3a3f4b;
-            --accent-color: #c678dd;
-            --accent-color-hover: #be50e7;
-            --item-hover-bg: #3a3f4b;
-            --danger-color: #e06c75;
+            /* --- 色彩系統 --- */
+            --bg-base: #161b22;
+            --bg-panel: #0d1117;
+            --bg-card: #21262d;
+            --bg-hover: #30363d;
+            --border-subtle: rgba(240, 246, 252, 0.1);
+            --text-primary: #e6edf3;
+            --text-secondary: #8b949e;
+            --accent-color: #a371f7;
+            --accent-glow: rgba(163, 113, 247, 0.25);
+            --danger-color: #f85149;
+            --radius-s: 6px;
+            --radius-m: 12px;
         }
+
+        * {
+            box-sizing: border-box;
+            user-select: none;
+        }
+
         body {
             margin: 0;
-            background-color: var(--bg-color);
-            color: var(--text-color);
-            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background-color: var(--bg-base);
+            color: var(--text-primary);
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
             display: flex;
             flex-direction: column;
-            width: 800px; /* 擴充功能彈出視窗的寬度 */
-            height: 600px; /* 擴充功能彈出視窗的高度 */
+            width: 800px;
+            height: 600px;
             overflow: hidden;
+            font-size: 14px;
+            line-height: 1.5;
         }
-        h3 { 
-            background-color: var(--header-color); color: var(--panel-bg-color);
-            padding: 10px; margin: 0; font-size: 1.1em; text-align: center; user-select: none;
+
+        /* 滾動條樣式 */
+        ::-webkit-scrollbar {
+            width: 5px;
+            height: 5px;
         }
-        /* --- 上方控制列 --- */
+
+        ::-webkit-scrollbar-track {
+            background: transparent;
+        }
+
+        ::-webkit-scrollbar-thumb {
+            background: #484f58;
+            border-radius: 10px;
+        }
+
+        ::-webkit-scrollbar-thumb:hover {
+            background: #6e7681;
+        }
+
+        /* --- 上方導航列 --- */
         #top-bar {
-            display: flex; align-items: center; justify-content: space-between;
-            padding: 8px 15px; background: var(--panel-bg-color); border-bottom: 1px solid var(--border-color);
+            height: 60px;
+            padding: 0 24px;
+            background: rgba(13, 17, 23, 0.95);
+            border-bottom: 1px solid var(--border-subtle);
+            backdrop-filter: blur(10px);
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            flex-shrink: 0; /* 防止被擠壓 */
         }
-        #toggle-switch-container { display: flex; align-items: center; gap: 10px; }
-        .switch { position: relative; display: inline-block; width: 50px; height: 24px; }
+
+        #top-bar h3 {
+            margin: 0;
+            font-size: 18px;
+            font-weight: 600;
+            letter-spacing: 0.5px;
+            color: #fff;
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
+
+        #top-bar h3::before {
+            content: '';
+            display: block;
+            width: 8px;
+            height: 8px;
+            background: var(--accent-color);
+            border-radius: 50%;
+            box-shadow: 0 0 8px var(--accent-color);
+        }
+
+        #toggle-switch-container {
+            display: flex;
+            align-items: center;
+            gap: 12px;
+            font-size: 13px;
+            font-weight: 500;
+            color: var(--text-secondary);
+            background: rgba(255, 255, 255, 0.03);
+            padding: 4px 12px;
+            border-radius: 20px;
+        }
+
+        /* 開關樣式 */
+        .switch {
+            position: relative;
+            display: inline-block;
+            width: 44px;
+            height: 24px;
+        }
         .switch input { opacity: 0; width: 0; height: 0; }
-        .slider { position: absolute; cursor: pointer; top: 0; left: 0; right: 0; bottom: 0; background-color: #4b5263; transition: .4s; border-radius: 24px; }
-        .slider:before { position: absolute; content: ""; height: 16px; width: 16px; left: 4px; bottom: 4px; background-color: white; transition: .4s; border-radius: 50%; }
-        input:checked + .slider { background-color: var(--accent-color); }
-        input:checked + .slider:before { transform: translateX(26px); }
 
-        /* --- 主內容區 --- */
-        #main-container { display: flex; flex-grow: 1; min-height: 0; }
-        .panel {
-            background: var(--panel-bg-color);
-            border-right: 1px solid var(--border-color);
-            display: flex; flex-direction: column; overflow: hidden;
+        .slider {
+            position: absolute;
+            cursor: pointer;
+            top: 0;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            background-color: #30363d;
+            transition: .3s;
+            border-radius: 24px;
+            border: 1px solid #484f58;
         }
-        #shader-library { width: 220px; }
-        #pipeline-container { flex-grow: 1; display: flex; flex-direction: column; }
-        #properties-panel { width: 240px; border-right: none; }
 
-        #library-content, #pipeline-list, #properties-content { overflow-y: auto; flex-grow: 1; }
-        
-        /* 著色器庫 */
-        .shader-category > h4 { cursor: pointer; padding: 8px 12px; margin: 0; background: #333842; border-top: 1px solid var(--border-color); border-bottom: 1px solid var(--border-color); font-size: 0.9em; }
-        .shader-category > h4:hover { background: var(--item-hover-bg); }
-        .shader-list { list-style: none; padding: 0; margin: 0; }
-        .shader-list li { padding: 8px 15px; cursor: pointer; border-bottom: 1px solid var(--border-color); font-size: 0.85em; display: flex; justify-content: space-between; align-items: center; gap: 10px; }
-        .shader-list li:hover { background: var(--item-hover-bg); }
-        .shader-name { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; flex-grow: 1; }
-        .add-btn { background: var(--accent-color); color: white; border: none; padding: 4px 8px; border-radius: 3px; cursor: pointer; flex-shrink: 0; }
-        .add-btn:hover { background: var(--accent-color-hover); }
+        .slider:before {
+            position: absolute;
+            content: "";
+            height: 18px;
+            width: 18px;
+            left: 2px;
+            bottom: 2px;
+            background-color: #c9d1d9;
+            transition: .3s;
+            border-radius: 50%;
+        }
 
-        /* 渲染管線 */
-        #pipeline-list { min-height: 150px; padding: 5px; list-style: none; margin: 0;}
-        .pipeline-item { background: #333842; padding: 8px; margin-bottom: 5px; border-radius: 3px; cursor: grab; display: flex; justify-content: space-between; align-items: center; border: 1px solid transparent;}
-        .pipeline-item.selected { border-color: var(--accent-color); }
-        .pipeline-item:active { cursor: grabbing; }
-        .pipeline-item.drag-over { border-top: 2px solid var(--accent-color); }
-        .remove-btn { background: var(--danger-color); color: white; border: none; border-radius: 50%; width: 20px; height: 20px; cursor: pointer; line-height: 20px; text-align: center; flex-shrink: 0; }
+        input:checked + .slider {
+            background-color: var(--accent-color);
+            border-color: var(--accent-color);
+            box-shadow: 0 0 10px var(--accent-glow);
+        }
 
-        /* 屬性面板 */
-        #properties-content { padding: 15px; }
-        .control-group { margin-bottom: 15px; }
-        .control-group label { display: block; margin-bottom: 5px; font-size: 0.9em; }
-        .control-group input[type="range"] { width: 100%; }
-        .control-group span { float: right; font-weight: bold; font-size: 0.9em; }
-        #placeholder-text { text-align: center; margin-top: 20px; font-style: italic; }
+        input:checked + .slider:before {
+            transform: translateX(20px);
+            background-color: #fff;
+        }
+
+        /* --- 主佈局調整 (關鍵修改處) --- */
+        #main-container {
+            display: flex;
+            flex-grow: 1;
+            overflow: hidden;
+            background: var(--bg-base);
+        }
+
+        .panel {
+            display: flex;
+            flex-direction: column;
+            background: var(--bg-panel);
+            position: relative;
+        }
+
+        .panel h3 {
+            padding: 14px 16px;
+            margin: 0;
+            font-size: 12px;
+            text-transform: uppercase;
+            letter-spacing: 1px;
+            color: var(--text-secondary);
+            background: var(--bg-panel);
+            border-bottom: 1px solid var(--border-subtle);
+            flex-shrink: 0;
+        }
+
+        /* --- 欄位寬度設定 --- */
+
+        /* 1. 左側庫：加寬到 290px */
+        #shader-library {
+            width: 290px;
+            border-right: 1px solid var(--border-subtle);
+            z-index: 2;
+        }
+
+        /* 2. 中間管線：自適應剩餘空間 (約 280px) */
+        #pipeline-container {
+            flex-grow: 1;
+            background: var(--bg-base);
+            min-width: 200px;
+        }
+
+        /* 3. 右側屬性：稍微縮窄到 230px (夠放滑桿即可) */
+        #properties-panel {
+            width: 230px;
+            border-left: 1px solid var(--border-subtle);
+            z-index: 2;
+        }
+
+        /* 內容區塊 */
+        #library-content, #pipeline-list, #properties-content {
+            padding: 10px;
+            overflow-y: auto;
+            flex-grow: 1;
+        }
+
+        /* --- 列表項目優化 (防止文字擠壓) --- */
+        .shader-category > h4 {
+            margin: 0 0 4px 0;
+            padding: 8px 10px;
+            cursor: pointer;
+            border-radius: var(--radius-s);
+            color: var(--text-primary);
+            font-size: 13px;
+            font-weight: 600;
+            display: flex;
+            align-items: center;
+        }
+
+        .shader-category > h4:hover {
+            background: var(--bg-hover);
+        }
+
+        .shader-category > h4::before {
+            content: '▸';
+            display: inline-block;
+            width: 18px;
+            color: var(--text-secondary);
+        }
+
+        .shader-list li {
+            padding: 8px 10px 8px 28px; /* 調整內距 */
+            margin-bottom: 2px;
+            cursor: pointer;
+            border-radius: var(--radius-s);
+            font-size: 13px;
+            color: var(--text-secondary);
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            transition: all 0.2s;
+            white-space: nowrap; /* 不換行 */
+        }
+
+        .shader-list li:hover {
+            background: var(--bg-hover);
+            color: #fff;
+        }
+
+        /* 處理長檔名 */
+        .shader-name {
+            overflow: hidden;
+            text-overflow: ellipsis;
+            margin-right: 8px; /* 與按鈕保持距離 */
+        }
+
+        .add-btn {
+            opacity: 0;
+            background: var(--accent-color);
+            color: white;
+            border: none;
+            width: 22px;
+            height: 22px;
+            border-radius: 4px;
+            cursor: pointer;
+            font-size: 16px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            transition: opacity 0.2s;
+            flex-shrink: 0;
+        }
+
+        .shader-list li:hover .add-btn {
+            opacity: 1;
+        }
+
+        /* --- 管線項目 --- */
+        #pipeline-list {
+            padding: 16px;
+            margin: 0;
+            display: flex;
+            flex-direction: column;
+            gap: 8px;
+        }
+
+        .pipeline-item {
+            background: var(--bg-card);
+            border: 1px solid var(--border-subtle);
+            padding: 12px 14px;
+            border-radius: var(--radius-s);
+            cursor: grab;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+            transition: transform 0.2s, border-color 0.2s;
+        }
+
+        .pipeline-item:hover {
+            transform: translateY(-2px);
+            border-color: #8b949e;
+        }
+
+        .pipeline-item.selected {
+            border-color: var(--accent-color);
+            background: rgba(163, 113, 247, 0.08);
+        }
+
+        .remove-btn {
+            background: transparent;
+            color: var(--text-secondary);
+            border: none;
+            width: 24px;
+            height: 24px;
+            border-radius: 4px;
+            cursor: pointer;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 18px;
+        }
+
+        .remove-btn:hover {
+            background: rgba(248, 81, 73, 0.15);
+            color: var(--danger-color);
+        }
+
+        /* --- 屬性控制 --- */
+        #properties-content {
+            padding: 16px;
+        }
+
+        .control-group {
+            margin-bottom: 20px;
+        }
+
+        .control-group label {
+            display: flex;
+            justify-content: space-between;
+            margin-bottom: 10px;
+            font-size: 12px;
+            color: var(--text-secondary);
+            font-weight: 500;
+        }
+
+        .control-group span {
+            font-family: monospace;
+            color: var(--accent-color);
+            background: rgba(163, 113, 247, 0.1);
+            padding: 2px 6px;
+            border-radius: 4px;
+        }
+
+        input[type="range"] {
+            -webkit-appearance: none;
+            width: 100%;
+            height: 4px;
+            background: #30363d;
+            border-radius: 2px;
+            outline: none;
+            margin: 0;
+        }
+
+        input[type="range"]::-webkit-slider-thumb {
+            -webkit-appearance: none;
+            width: 16px;
+            height: 16px;
+            border-radius: 50%;
+            background: #c9d1d9;
+            border: 2px solid var(--bg-panel);
+            cursor: pointer;
+            transition: transform 0.1s;
+        }
+
+        input[type="range"]::-webkit-slider-thumb:hover {
+            background: var(--accent-color);
+            transform: scale(1.2);
+        }
+
+        /* 空狀態 */
+        #placeholder-text {
+            text-align: center;
+            margin-top: 50px;
+            color: var(--text-secondary);
+            font-style: italic;
+            opacity: 0.6;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            gap: 8px;
+        }
     </style>
 </head>
 <body>
 
-    <div id="top-bar">
-        <h3>YouTube VSR 控制面板</h3>
-        <div id="toggle-switch-container">
-            <span>停用</span>
-            <label class="switch">
-                <input type="checkbox" id="master-toggle">
-                <span class="slider"></span>
-            </label>
-            <span>啟用</span>
+<div id="top-bar">
+    <h3>YouTube VSR</h3>
+    <div id="toggle-switch-container">
+        <span>OFF</span>
+        <label class="switch">
+            <input id="master-toggle" type="checkbox">
+            <span class="slider"></span>
+        </label>
+        <span style="color: var(--accent-color)">ON</span>
+    </div>
+</div>
+
+<div id="main-container">
+
+    <!-- 左側：已加寬 -->
+    <div class="panel" id="shader-library">
+        <h3>Library</h3>
+        <div id="library-content">
+            <p style="text-align: center; color: var(--text-secondary); font-size:13px; margin-top:20px;">
+                (Library Content)
+            </p>
         </div>
     </div>
 
-    <div id="main-container">
-
-        <div id="shader-library" class="panel">
-            <h3>著色器庫</h3>
-            <div id="library-content"></div>
-        </div>
-
-        <div id="pipeline-container" class="panel">
-            <h3>渲染管線 (可拖曳排序)</h3>
-            <ul id="pipeline-list"></ul>
-        </div>
-
-        <div id="properties-panel" class="panel">
-            <h3>屬性</h3>
-            <div id="properties-content">
-                <p id="placeholder-text">在管線中選擇一個效果以編輯其屬性。</p>
-            </div>
-        </div>
-
+    <!-- 中間：自適應 -->
+    <div class="panel" id="pipeline-container">
+        <h3>Pipeline</h3>
+        <ul id="pipeline-list">
+            <li style="text-align: center; color: var(--text-secondary); font-size:13px; margin-top:40px; border: 2px dashed var(--border-subtle); padding: 20px; border-radius: var(--radius-s);">
+                Drag effects here
+            </li>
+        </ul>
     </div>
 
-    <script src="popup.js"></script>
+    <!-- 右側：已稍微縮減 -->
+    <div class="panel" id="properties-panel">
+        <h3>Properties</h3>
+        <div id="properties-content">
+            <p id="placeholder-text">
+                <span>⚙️</span>
+                Select an effect
+            </p>
+        </div>
+    </div>
+
+</div>
+
+<script src="popup.js"></script>
 </body>
 </html>
