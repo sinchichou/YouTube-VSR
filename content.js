@@ -182,7 +182,7 @@
      * @param {number} now - The timestamp from requestVideoFrameCallback.
      */
     async function renderLoop(now) {
-        // If there's no active shader, ensure canvas is hidden and original video is visible, then continue monitoring.
+        // If there's no active shader, hide canvas and show original video
         if (!wgfx) {
             if (canvas) canvas.style.display = 'none';
             if (videoElement) videoElement.style.opacity = '1';
@@ -192,7 +192,7 @@
             return;
         }
 
-        // Proceed only if running, and video is ready
+        // Only proceed if running and video is ready
         if (!isRunning || !videoElement || videoElement.readyState < 2 || videoElement.videoWidth === 0) {
             if (isRunning && videoElement) {
                 animationFrameId = videoElement.requestVideoFrameCallback(renderLoop);
@@ -200,7 +200,7 @@
             return;
         }
 
-        // 確保 Canvas 可見
+        // Ensure canvas is visible
         if (canvas && canvas.style.display === 'none') {
             canvas.style.display = 'block';
             if (videoElement) videoElement.style.opacity = '0';
@@ -208,7 +208,6 @@
 
         let frameBitmap;
         try {
-            // Use createImageBitmap for optimal performance and WebGPU compatibility
             frameBitmap = await createImageBitmap(videoElement);
         } catch (e) {
             console.warn("YouTube VSR Warn: Failed to create ImageBitmap. Frame skipped.", e);
@@ -216,64 +215,141 @@
             return;
         }
 
-        let outputTextureView;
         try {
-            outputTextureView = await wgfx.processFrame({
+            // Process frame through WGFX
+            const outputTextureView = await wgfx.processFrame({
                 frameBitmap: frameBitmap,
                 uniforms: effectParameters
             });
 
-            // 處理完成後，將結果渲染到 WebGPU Canvas 上
+            // Get canvas texture
+            const canvasTexture = context.getCurrentTexture();
             const commandEncoder = device.createCommandEncoder();
-            const texture = context.getCurrentTexture();
-            const renderPass = commandEncoder.beginRenderPass({
-                colorAttachments: [{
-                    view: texture.createView(),
-                    loadOp: 'clear',
-                    storeOp: 'store',
-                }],
+
+            // CRITICAL FIX: Cannot directly copy between different formats
+            // We need a render pass to convert rgba16float -> canvas format
+
+            // Create a simple blit render pipeline if not exists
+            if (!window._blitPipeline) {
+                const blitShaderModule = device.createShaderModule({
+                    code: `
+                    @vertex
+                    fn vs_main(@builtin(vertex_index) vertexIndex: u32) -> @builtin(position) vec4f {
+                        // Full-screen triangle
+                        var pos = array<vec2f, 3>(
+                            vec2f(-1.0, -1.0),
+                            vec2f( 3.0, -1.0),
+                            vec2f(-1.0,  3.0)
+                        );
+                        return vec4f(pos[vertexIndex], 0.0, 1.0);
+                    }
+
+                    @group(0) @binding(0) var inputTexture: texture_2d<f32>;
+                    @group(0) @binding(1) var inputSampler: sampler;
+
+                    @fragment
+                    fn fs_main(@builtin(position) fragCoord: vec4f) -> @location(0) vec4f {
+                        let uv = fragCoord.xy / vec2f(${canvas.width}.0, ${canvas.height}.0);
+                        return textureSample(inputTexture, inputSampler, uv);
+                    }
+                `
+                });
+
+                const blitBindGroupLayout = device.createBindGroupLayout({
+                    entries: [
+                        {
+                            binding: 0,
+                            visibility: GPUShaderStage.FRAGMENT,
+                            texture: {sampleType: 'float'}
+                        },
+                        {
+                            binding: 1,
+                            visibility: GPUShaderStage.FRAGMENT,
+                            sampler: {type: 'filtering'}
+                        }
+                    ]
+                });
+
+                const blitPipelineLayout = device.createPipelineLayout({
+                    bindGroupLayouts: [blitBindGroupLayout]
+                });
+
+                window._blitPipeline = device.createRenderPipeline({
+                    layout: blitPipelineLayout,
+                    vertex: {
+                        module: blitShaderModule,
+                        entryPoint: 'vs_main'
+                    },
+                    fragment: {
+                        module: blitShaderModule,
+                        entryPoint: 'fs_main',
+                        targets: [{
+                            format: navigator.gpu.getPreferredCanvasFormat()
+                        }]
+                    },
+                    primitive: {
+                        topology: 'triangle-list'
+                    }
+                });
+
+                window._blitSampler = device.createSampler({
+                    magFilter: 'linear',
+                    minFilter: 'linear'
+                });
+
+                window._blitBindGroupLayout = blitBindGroupLayout;
+            }
+
+            // Create bind group for this frame
+            const blitBindGroup = device.createBindGroup({
+                layout: window._blitBindGroupLayout,
+                entries: [
+                    {
+                        binding: 0,
+                        resource: outputTextureView
+                    },
+                    {
+                        binding: 1,
+                        resource: window._blitSampler
+                    }
+                ]
             });
 
-            // --- Simplified Display Logic ---
-            // NOTE: Since WGFX is a compute-based engine (assuming from your IR structure),
-            // the outputTextureView needs to be copied/displayed to the canvas.
-            // This requires a separate display pipeline (copy or render pass).
-            // For simplicity and correctness in this refactor, we must explicitly copy
-            // the final WGFX output (outputTextureView which is a GPUTextureView)
-            // to the canvas texture (texture).
+            // Render pass to blit output to canvas
+            const renderPass = commandEncoder.beginRenderPass({
+                colorAttachments: [{
+                    view: canvasTexture.createView(),
+                    loadOp: 'clear',
+                    clearValue: {r: 0, g: 0, b: 0, a: 1},
+                    storeOp: 'store'
+                }]
+            });
 
-            // 假設我們需要一個簡單的貼圖到全螢幕四邊形的渲染管線，
-            // 但為了避免引入過多代碼，我們採用最簡單的 GPU 拷貝操作（如果輸出紋理允許）。
+            renderPass.setPipeline(window._blitPipeline);
+            renderPass.setBindGroup(0, blitBindGroup);
+            renderPass.draw(3); // Full-screen triangle
+            renderPass.end();
 
-            // For a complete solution, a `WGFX.blitToCanvas(outputTextureView, context)`
-            // method would be ideal. Without it, we do a basic GPU copy if available.
-
-            commandEncoder.copyTextureToTexture(
-                {texture: outputTextureView.texture},
-                {texture: texture},
-                [canvas.width, canvas.height]
-            );
-
-            // Ensure ImageBitmap is closed after use
-            frameBitmap.close();
-
+            // Submit commands
             device.queue.submit([commandEncoder.finish()]);
+
+            // Close ImageBitmap
+            frameBitmap.close();
 
         } catch (e) {
             console.error("YouTube VSR Error during frame processing:", e);
-            // Ensure ImageBitmap is closed if error occurred after creation
             if (frameBitmap && frameBitmap.close) frameBitmap.close();
-            stop(); // If processing fails, stop the loop
+            stop();
             return;
         }
 
-        // Request the next frame
+        // Request next frame
         animationFrameId = videoElement.requestVideoFrameCallback(renderLoop);
     }
-
     //================================================================================
     // WebGPU Setup & Pipeline Management
     //================================================================================
+
 
     async function setupWebGPU() {
         try {
@@ -281,11 +357,37 @@
             const adapter = await navigator.gpu.requestAdapter();
             if (!adapter) throw new Error("Could not find a GPU adapter.");
 
-            // Use high performance if available
+            // Check adapter capabilities
+            console.log("YouTube VSR : GPU Adapter Limits:");
+            console.log("  - maxStorageTexturesPerShaderStage:", adapter.limits.maxStorageTexturesPerShaderStage);
+            console.log("  - maxComputeWorkgroupSizeX:", adapter.limits.maxComputeWorkgroupSizeX);
+            console.log("  - maxComputeWorkgroupSizeY:", adapter.limits.maxComputeWorkgroupSizeY);
+
+            // CRITICAL FIX: Anime4K shaders require up to 8 storage textures per stage
+            // Default WebGPU limit is only 4, which causes "exceeds the maximum per-stage limit" error
+            const requiredStorageTextures = 8;
+            const maxSupported = adapter.limits.maxStorageTexturesPerShaderStage;
+
+            if (maxSupported < requiredStorageTextures) {
+                console.warn(
+                    `YouTube VSR Warning: GPU only supports ${maxSupported} storage textures per stage. ` +
+                    `Anime4K requires ${requiredStorageTextures}. Some effects may fail.`
+                );
+            }
+
             device = await adapter.requestDevice({
                 requiredFeatures: [],
-                requiredLimits: {},
+                requiredLimits: {
+                    // Request higher storage texture limit (up to hardware max)
+                    maxStorageTexturesPerShaderStage: Math.min(
+                        requiredStorageTextures,
+                        maxSupported
+                    )
+                },
             });
+
+            console.log("YouTube VSR : Device created successfully");
+            console.log("  - Effective maxStorageTexturesPerShaderStage:", device.limits.maxStorageTexturesPerShaderStage);
 
             device.lost.then(info => {
                 console.error(`WebGPU device lost: ${info.message}`);
@@ -381,21 +483,31 @@
                 INPUT_HEIGHT: height,
             };
 
+            // CRITICAL FIX: Use rgba16float for OUTPUT texture to support storage write operations
+            // rgba8unorm is NOT supported as a storage texture format in WebGPU
             const externalResources = {
                 defines,
                 textures: {
                     INPUT: {
                         size: [width, height],
-                        format: 'rgba8unorm',
+                        format: 'rgba8unorm',  // INPUT 可以保持 rgba8unorm (僅用於讀取)
                         usage: GPUTextureUsage.TEXTURE_BINDING | GPUTextureUsage.COPY_DST
                     },
                     OUTPUT: {
                         size: [width, height],
-                        format: navigator.gpu.getPreferredCanvasFormat(),
-                        usage: GPUTextureUsage.STORAGE_BINDING | GPUTextureUsage.COPY_SRC
+                        format: 'rgba16float',  // *** 修正: 使用 rgba16float 而非 rgba8unorm ***
+                        usage: GPUTextureUsage.STORAGE_BINDING | GPUTextureUsage.COPY_SRC | GPUTextureUsage.TEXTURE_BINDING
                     }
                 }
             };
+
+            console.log("YouTube VSR : Creating WGFX with externalResources:", {
+                defines,
+                textureFormats: {
+                    INPUT: externalResources.textures.INPUT.format,
+                    OUTPUT: externalResources.textures.OUTPUT.format
+                }
+            });
 
             wgfx = await WGFXClass.create({
                 device,
@@ -423,7 +535,6 @@
             }
         }
     }
-
 
     //================================================================================
     // Utility & Event Handlers
