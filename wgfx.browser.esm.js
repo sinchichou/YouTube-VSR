@@ -769,263 +769,128 @@ function peg$parse(input, options) {
     }
 }
 
-// src/runtime/ResourceManager.js
-
-/**
- * @fileoverview
- * - EN: Manages the creation, storage, and retrieval of WebGPU resources.
- *   This class handles GPUTexture, GPUSampler, and GPUBuffer objects based on the shader IR,
- *   providing a central location to access these resources by name.
- * - TW: 管理 WebGPU 資源的建立、儲存和檢索。
- *   此類別根據著色器 IR 處理 GPUTexture、GPUSampler 和 GPUBuffer 物件，
- *   提供一個中心位置，可以按名稱存取這些資源。
- */
-
-let GPUDevice$1, GPUTextureUsage, GPUBufferUsage;
-
-/**
- * - EN: In a Node.js environment, native WebGPU objects don't exist.
- *   We check for their existence on the global scope. If they don't exist,
- *   they will remain `undefined`, which is safe for the CLI code path
- *   as it doesn't instantiate or use any GPU-related objects.
- * - TW: 在 Node.js 環境中，原生 WebGPU 物件不存在。
- *   我們檢查它們是否在全域範圍內存在。如果不存在，
- *   它們將保持 `undefined`，這對於 CLI 程式碼路徑是安全的，
- *   因為它不實例化或使用任何與 GPU 相關的物件。
- */
-try {
-    /**
-     * - EN: This will only succeed in a browser-like environment with WebGPU support.
-     * - TW: 這只會在支援 WebGPU 的瀏覽器環境中成功。
-     */
-    if (globalThis.GPUDevice) {
-        GPUDevice$1 = globalThis.GPUDevice;
-        GPUTextureUsage = globalThis.GPUTextureUsage;
-        GPUBufferUsage = globalThis.GPUBufferUsage;
-    }
-    /**
-     * - EN: In Node.js or a non-WebGPU environment, these will remain undefined.
-     *   This is safe because the CLI path does not use this functionality.
-     * - TW: 在 Node.js 或非 WebGPU 環境中，這些將保持未定義。
-     *   這很安全，因為 CLI 路徑不使用此功能。
-     */
-} catch (e) {
-    /**
-     * - EN: Ignore any errors during this detection phase.
-     *   The variables will simply remain undefined.
-     * - TW: 在此檢測階段忽略任何錯誤。
-     *   變數將簡單地保持未定義。
-     */
-}
-
-
-/**
- * - EN: ResourceManager Implementation
- * - TW: 資源管理器實作
- */
-
 class ResourceManager {
-    /**
-     * @param {GPUDevice} [device]
-     * - EN: The active WebGPU device. If not provided, a mock device will be used.
-     * - TW: 作用中的 WebGPU 裝置。如果未提供，將使用模擬裝置。
-     */
+    device;
+    textures;
+    views;
+    samplers;
+    uniforms;
+    uniformBuffer;
     constructor(device) {
-        /** @type {GPUDevice} */
-        /**
-         * - EN: Use provided device or a mock device.
-         * - TW: 使用提供的裝置或模擬裝置。
-         */
-        this.device = device || new GPUDevice$1();
-        /**
-         * - EN: Stores GPUTexture objects, mapped by their unique names.
-         * - TW: 儲存 GPUTexture 物件，按其唯一名稱映射。
-         * @type {Map<string, import('./WebGPU-mock.js').GPUTexture>}
-         */
+        if (!device) {
+            throw new Error('ResourceManager requires a valid GPUDevice');
+        }
+        this.device = device;
         this.textures = new Map();
-        /**
-         * - EN: Stores GPUSampler objects, mapped by their unique names.
-         * - TW: 儲存 GPUSampler 物件，按其唯一名稱映射。
-         * @type {Map<string, import('./WebGPU-mock.js').GPUSampler>}
-         */
+        this.views = new Map();
         this.samplers = new Map();
-        /**
-         * - EN: Stores metadata for each uniform, including its offset and size within the main buffer.
-         * - TW: 儲存每個 uniform 的元資料，包括其在主緩衝區中的偏移量和大小。
-         * @type {Map<string, {buffer: import('./WebGPU-mock.js').GPUBuffer, offset: number, size: number}>}
-         */
         this.uniforms = new Map();
-        /**
-         * - EN: A single GPU buffer used to store all uniform parameters.
-         * - TW: 用於儲存所有 uniform 參數的單一 GPU 緩衝區。
-         * @type {import('./WebGPU-mock.js').GPUBuffer}
-         */
         this.uniformBuffer = null;
     }
-
-    /**
-     * - EN: Initializes all GPU resources based on the parsed shader IR.
-     * - TW: 根據解析後的著色器 IR 初始化所有 GPU 資源。
-     * @param {import('./ShaderParser.js').WGFXShaderInfo} shaderInfo
-     * - EN: Parsed shader information from Parser.js.
-     * - TW: 來自 Parser.js 的解析後著色器資訊。
-     */
-
-    /**
-     * - EN: Initializes all GPU resources based on the parsed shader IR.
-     * - TW: 根據解析後的著色器 IR 初始化所有 GPU 資源。
-     * @param {import('./ShaderParser.js').WGFXShaderInfo} shaderInfo
-     * - EN: Parsed shader information from Parser.js.
-     * - TW: 來自 Parser.js 的解析後著色器資訊。
-     */
-    /**
-     * - EN: Initializes all GPU resources based on the parsed shader IR.
-     * - TW: 根據解析後的著色器 IR 初始化所有 GPU 資源。
-     * @param {import('./ShaderParser.js').WGFXShaderInfo} shaderInfo
-     * - EN: Parsed shader information from Parser.js.
-     * - TW: 來自 Parser.js 的解析後著色器資訊。
-     */
     initialize(shaderInfo, externalResources = {}) {
         const context = {};
-
-        // 1. [優先] 載入外部定義的常數 (如 INPUT_WIDTH/HEIGHT)
+        // 1. Load defines
         if (externalResources.defines) {
             Object.assign(context, externalResources.defines);
+            console.log('Loaded external defines:', context);
         }
-
-        // 2. 建立外部紋理 (INPUT, OUTPUT 等)
+        // 2. Create external textures
         if (externalResources.textures) {
             for (const [name, descriptor] of Object.entries(externalResources.textures)) {
+                console.log(`Creating external texture: ${name}`, descriptor);
                 this.createTexture(name, descriptor);
             }
         }
-
-        // 3. [後備] 如果 defines 沒給尺寸，嘗試從剛剛建立的 INPUT 紋理反查
-        if ((!context['INPUT_WIDTH'] || !context['INPUT_HEIGHT']) && this.textures.has('INPUT')) {
-            const inputTexture = this.getTexture('INPUT');
-            if (inputTexture) {
-                if (!context['INPUT_WIDTH']) context['INPUT_WIDTH'] = inputTexture.width;
-                if (!context['INPUT_HEIGHT']) context['INPUT_HEIGHT'] = inputTexture.height;
-            }
-        }
-
-        // --- Safe Math Parser (CSP Compliant: No eval/new Function) ---
-        // 實作一個簡單的遞迴下降解析器，支援 +, -, *, /, %, () 和小數
-        const parseMathExpression = (str) => {
-            let pos = 0;
-            // 移除所有空白
-            str = str.replace(/\s+/g, '');
-
-            const peek = () => str[pos];
-            const consume = () => str[pos++];
-
-            const parseFactor = () => {
-                if (peek() === '(') {
-                    consume(); // 吃掉 '('
-                    const result = parseExpr();
-                    if (peek() !== ')') throw new Error("Expected ')'");
-                    consume(); // 吃掉 ')'
-                    return result;
-                }
-
-                // 解析數字 (含負號和小數點)
-                let numStr = '';
-                if (peek() === '-') {
-                    numStr += consume();
-                }
-                while (pos < str.length && (/[0-9.]/).test(peek())) {
-                    numStr += consume();
-                }
-                if (numStr === '') throw new Error(`Unexpected char: '${peek()}' at pos ${pos}`);
-                return parseFloat(numStr);
-            };
-
-            const parseTerm = () => {
-                let left = parseFactor();
-                while (pos < str.length) {
-                    const op = peek();
-                    if (op === '*' || op === '/' || op === '%') {
-                        consume();
-                        const right = parseFactor();
-                        if (op === '*') left *= right;
-                        else if (op === '/') left /= right;
-                        else if (op === '%') left %= right;
-                    } else {
-                        break;
-                    }
-                }
-                return left;
-            };
-
-            const parseExpr = () => {
-                let left = parseTerm();
-                while (pos < str.length) {
-                    const op = peek();
-                    if (op === '+' || op === '-') {
-                        consume();
-                        const right = parseTerm();
-                        if (op === '+') left += right;
-                        else if (op === '-') left -= right;
-                    } else {
-                        break;
-                    }
-                }
-                return left;
-            };
-
-            const result = parseExpr();
-            return result;
-        };
-
+        // Evaluate helper
         const evaluate = (expr, ctx) => {
-            if (typeof expr !== 'string') return expr;
-
-            // 替換變數
-            let evaluatedExpr = expr;
-            for (const key in ctx) {
-                const regex = new RegExp('\\b' + key + '\\b', 'g');
-                evaluatedExpr = evaluatedExpr.replace(regex, ctx[key]);
-            }
-
-            try {
-                // 如果替換後只是單純的數字字串，直接轉換 (最快)
-                if (!isNaN(Number(evaluatedExpr))) {
-                    return Math.ceil(Number(evaluatedExpr));
+            if (typeof expr === 'number')
+                return expr;
+            // Remove whitespace
+            expr = expr.replace(/\s+/g, '');
+            // Simple recursive descent parser to handle basic arithmetic and variables
+            let pos = 0;
+            const parseNumber = () => {
+                let startKey = pos;
+                if (/[a-zA-Z_]/.test(expr[pos])) {
+                    while (pos < expr.length && /[a-zA-Z0-9_]/.test(expr[pos]))
+                        pos++;
+                    const key = expr.slice(startKey, pos);
+                    if (key in ctx)
+                        return ctx[key];
+                    throw new Error(`Undefined variable: ${key}`);
                 }
-                // 否則使用安全的解析器計算
-                return Math.ceil(parseMathExpression(evaluatedExpr));
-            } catch (e) {
-                console.error("Evaluation failed. Context:", ctx);
-                throw new Error(`Cannot evaluate expression: "${expr}". Resulted in: "${evaluatedExpr}". Error: ${e.message}`);
+                else if (/[0-9.]/.test(expr[pos])) {
+                    while (pos < expr.length && /[0-9.]/.test(expr[pos]))
+                        pos++;
+                    return parseFloat(expr.slice(startKey, pos));
+                }
+                else if (expr[pos] === '(') {
+                    pos++;
+                    const val = parseExpression();
+                    if (expr[pos] !== ')')
+                        throw new Error("Expected ')'");
+                    pos++;
+                    return val;
+                }
+                throw new Error(`Unexpected character at ${pos}: ${expr[pos]}`);
+            };
+            const parseFactor = () => {
+                let val = parseNumber();
+                while (pos < expr.length && (expr[pos] === '*' || expr[pos] === '/')) {
+                    const op = expr[pos++];
+                    const right = parseNumber();
+                    if (op === '*')
+                        val *= right;
+                    else
+                        val /= right;
+                }
+                return val;
+            };
+            const parseExpression = () => {
+                let val = parseFactor();
+                while (pos < expr.length && (expr[pos] === '+' || expr[pos] === '-')) {
+                    const op = expr[pos++];
+                    const right = parseFactor();
+                    if (op === '+')
+                        val += right;
+                    else
+                        val -= right;
+                }
+                return val;
+            };
+            try {
+                return parseExpression();
+            }
+            catch (e) {
+                console.warn(`Failed to evaluate expression: ${expr}`, e);
+                return 0;
             }
         };
-
-        /**
-         * - EN: Create textures defined in the shader.
-         * - TW: 建立著色器中定義的紋理。
-         */
-        shaderInfo.textures.forEach(tex => {
-            if (this.textures.has(tex.name)) return; // Already created externally
-
+        // 3. Create intermediate textures
+        shaderInfo.textures.forEach((tex) => {
+            if (this.textures.has(tex.name)) {
+                console.log(`Skipping existing texture: ${tex.name}`);
+                return;
+            }
             const width = evaluate(tex.width, context);
             const height = evaluate(tex.height, context);
-
             if (!width || !height) {
-                throw new Error(`Could not determine size for texture ${tex.name}. Width or height expression is invalid.`);
+                throw new Error(`Failed to determine size for texture ${tex.name}`);
             }
-
+            // Simplified: All internal textures use rgba16float
+            const format = (tex.name === 'INPUT' ? 'rgba8unorm' : 'rgba16float');
             const descriptor = {
                 size: [width, height],
-                format: tex.format?.toLowerCase() || 'rgba8unorm',
-                usage: GPUTextureUsage.TEXTURE_BINDING | GPUTextureUsage.STORAGE_BINDING | GPUTextureUsage.COPY_DST | GPUTextureUsage.COPY_SRC,
+                format: format,
+                usage: GPUTextureUsage.TEXTURE_BINDING |
+                    GPUTextureUsage.STORAGE_BINDING |
+                    GPUTextureUsage.COPY_DST |
+                    GPUTextureUsage.COPY_SRC
             };
             this.createTexture(tex.name, descriptor);
+            console.log(`Created texture: ${tex.name} (${width}x${height}, ${format})`);
         });
-
-        /**
-         * - EN: Create samplers defined in the shader.
-         * - TW: 建立著色器中定義的取樣器。
-         */
+        // 5. Create samplers
         shaderInfo.samplers.forEach(samp => {
             const descriptor = {
                 magFilter: samp.filter === 'LINEAR' ? 'linear' : 'nearest',
@@ -1034,775 +899,399 @@ class ResourceManager {
                 addressModeV: samp.address === 'WRAP' ? 'repeat' : 'clamp-to-edge',
             };
             this.createSampler(samp.name, descriptor);
+            console.log(`Created sampler: ${samp.name}`);
         });
-
-        /**
-         * - EN: Create a single uniform buffer to store all parameters.
-         * - TW: 建立一個單一的 uniform 緩衝區來儲存所有參數。
-         */
+        // 6. Create uniform buffer
         if (shaderInfo.parameters.length > 0) {
-            let totalSize = 0;
-            shaderInfo.parameters.forEach(param => {
-                const size = 4; // Assuming 4 bytes (f32/i32) for simplicity
-                this.uniforms.set(param.name, {buffer: null, offset: totalSize, size});
-                totalSize += size;
-            });
-
-            const alignedSize = Math.ceil(totalSize / 16) * 16;
-
-            this.uniformBuffer = this.device.createBuffer({
-                size: alignedSize,
-                usage: GPUBufferUsage.UNIFORM | GPUBufferUsage.COPY_DST,
-            });
-
-            this.uniforms.forEach(u => u.buffer = this.uniformBuffer);
+            this.createUniformBuffer(shaderInfo.parameters);
+            console.log(`Created UniformBuffer for ${shaderInfo.parameters.length} parameters`);
         }
-
-        console.log("ResourceManager: Resources initialized.", {
-            textures: [...this.textures.keys()],
-            samplers: [...this.samplers.keys()],
-            uniforms: [...this.uniforms.keys()],
-            context: context
-        });
+        // 7. Create Scene Buffer
+        this.createSceneBuffer();
     }
-    /**
-     * - EN: Creates or replaces a GPUTexture in the manager.
-     * - TW: 在管理器中建立或替換 GPUTexture。
-     * @param {string} name
-     * - EN: The unique name of the texture.
-     * - TW: 紋理的唯一名稱。
-     * @param {GPUTextureDescriptor} descriptor
-     * - EN: The descriptor for the texture.
-     * - TW: 紋理描述符。
-     * @returns {GPUTexture}
-     * - EN: The created GPUTexture.
-     * - TW: 建立的 GPUTexture。
-     */
     createTexture(name, descriptor) {
-        /**
-         * - EN: If a texture with the same name exists, destroy the old one first.
-         * - TW: 如果存在同名紋理，則先銷毀舊紋理。
-         */
         if (this.textures.has(name)) {
             this.textures.get(name).destroy();
         }
         const texture = this.device.createTexture(descriptor);
-        /**
-         * - EN: Set label for debugging.
-         * - TW: 設定標籤以進行調試。
-         */
         texture.label = name;
         this.textures.set(name, texture);
+        // Create dual views
+        this.views.set(name, {
+            sampled: texture.createView({ label: `${name}_sampled` }),
+            storage: texture.createView({ label: `${name}_storage` })
+        });
         return texture;
     }
-
-    /**
-     * - EN: Retrieves a texture by its name.
-     * - TW: 按名稱檢索紋理。
-     * @param {string} name
-     * - EN: The name of the texture.
-     * - TW: 紋理的名稱。
-     * @returns {GPUTexture | undefined}
-     * - EN: The texture object or undefined if not found.
-     * - TW: 紋理物件，如果找不到則為 undefined。
-     */
+    getTextureView(name, type = 'sampled') {
+        const v = this.views.get(name);
+        if (!v)
+            throw new Error(`View "${name}" not found`);
+        return v[type];
+    }
     getTexture(name) {
         return this.textures.get(name);
     }
-
-    /**
-     * - EN: Creates a new GPUSampler.
-     * - TW: 建立新的 GPUSampler。
-     * @param {string} name
-     * - EN: The unique name of the sampler.
-     * - TW: 取樣器的唯一名稱。
-     * @param {GPUSamplerDescriptor} descriptor
-     * - EN: The descriptor for the sampler.
-     * - TW: 取樣器描述符。
-     * @returns {GPUSampler}
-     * - EN: The created GPUSampler.
-     * - TW: 建立的 GPUSampler。
-     */
     createSampler(name, descriptor) {
         const sampler = this.device.createSampler(descriptor);
+        sampler.label = name;
         this.samplers.set(name, sampler);
         return sampler;
     }
-
-    /**
-     * - EN: Uploads image data (ImageBitmap, VideoFrame, etc.) to a specified GPUTexture.
-     * - TW: 將圖像資料 (ImageBitmap, VideoFrame 等) 上傳到指定的 GPUTexture。
-     * @param {string} name - The name of the texture (e.g., 'INPUT').
-     * @param {ImageBitmap | VideoFrame | HTMLCanvasElement} image - The source image data.
-     */
-    /**
-     * - EN: Updates a texture's content from an ImageBitmap, HTMLVideoElement, HTMLCanvasElement, or OffscreenCanvas
-     * - TW: 從 ImageBitmap、HTMLVideoElement、HTMLCanvasElement 或 OffscreenCanvas 更新紋理內容
-     *
-     * @param {string} textureName - The name of the texture to update
-     * @param {ImageBitmap | HTMLVideoElement | HTMLCanvasElement | OffscreenCanvas} imageSource - The image source
-     */
-    updateTextureFromImage(textureName, imageSource) {
-        const texture = this.textures.get(textureName);
-        if (!texture) {
-            throw new Error(`Texture "${textureName}" not found in ResourceManager.`);
-        }
-
-        // Get the size of the image source
-        let width, height;
-        if (imageSource instanceof HTMLVideoElement) {
-            width = imageSource.videoWidth;
-            height = imageSource.videoHeight;
-        } else {
-            width = imageSource.width;
-            height = imageSource.height;
-        }
-
-        // Validate dimensions
-        if (width === 0 || height === 0) {
-            throw new Error(`Image source has invalid dimensions: ${width}x${height}`);
-        }
-
-        // Validate texture size matches
-        if (texture.width !== width || texture.height !== height) {
-            console.warn(
-                `Texture "${textureName}" size (${texture.width}x${texture.height}) ` +
-                `does not match image size (${width}x${height}). Texture will be recreated.`
-            );
-            // In production, you might want to recreate the texture here
-            // For now, we'll throw an error
-            throw new Error(`Texture size mismatch for "${textureName}"`);
-        }
-
-        // CRITICAL FIX: Use the correct WebGPU API method
-        // The correct method name is copyExternalImageToTexture, not copyExternalImageToBufferOrTexture
-        this.device.queue.copyExternalImageToTexture(
-            {
-                source: imageSource,
-                flipY: false  // Set to true if you need to flip the image vertically
-            },
-            {
-                texture: texture,
-                mipLevel: 0,
-                origin: {x: 0, y: 0, z: 0}
-            },
-            {
-                width: width,
-                height: height,
-                depthOrArrayLayers: 1
-            }
-        );
-    }
-
-    /**
-     * - EN: Retrieves a sampler by its name.
-     * - TW: 按名稱檢索取樣器。
-     * @param {string} name
-     * - EN: The name of the sampler.
-     * - TW: 取樣器的名稱。
-     * @returns {GPUSampler | undefined}
-     * - EN: The sampler object or undefined if not found.
-     * - TW: 取樣器物件，如果找不到則為 undefined。
-     */
     getSampler(name) {
         return this.samplers.get(name);
     }
-
-    /**
-     * - EN: Retrieves the single uniform buffer for all parameters.
-     * - TW: 檢索所有參數的單一 uniform 緩衝區。
-     * @returns {GPUBuffer | null} - EN: The uniform buffer object, or null if no parameters exist. - TW: 統一緩衝區物件，如果不存在參數則為 null。
-     */
-    getUniformBuffer() {
-        return this.uniformBuffer;
-    }
-
-    /**
-     * - EN: Retrieves metadata for a specific uniform.
-     * - TW: 檢索特定 uniform 的元資料。
-     * @param {string} name
-     * - EN: The name of the uniform parameter.
-     * - TW: uniform 參數的名稱。
-     * @returns {{buffer: GPUBuffer, offset: number, size: number} | undefined}
-     * - EN: Metadata for the uniform, or undefined if not found.
-     * - TW: uniform 的元資料，如果找不到則為 undefined。
-     */
     getUniform(name) {
         return this.uniforms.get(name);
     }
-
-    /**
-     * - EN: Destroys all managed GPU resources to prevent memory leaks.
-     * - TW: 銷毀所有管理的 GPU 資源以防止記憶體洩漏。
-     */
+    updateTextureFromImage(name, source) {
+        const texture = this.textures.get(name);
+        if (!texture) {
+            console.warn(`Texture ${name} not found`);
+            return;
+        }
+        this.device.queue.copyExternalImageToTexture({ source: source }, { texture: texture }, [texture.width, texture.height]);
+        // Auto-update scene info if input changes
+        if (name === 'INPUT' && (source instanceof HTMLVideoElement || source instanceof ImageBitmap || source instanceof VideoFrame)) {
+            const width = (source instanceof VideoFrame) ? source.displayWidth : source.width;
+            const height = (source instanceof VideoFrame) ? source.displayHeight : source.height;
+            this.updateSceneBuffer(width, height);
+        }
+    }
+    createUniformBuffer(parameters) {
+        // Simple implementation: aligned to 16 bytes for simplicity
+        // In reality, should follow std140 layout rules strictly
+        let offset = 0;
+        parameters.forEach(p => {
+            const size = 4; // float/int
+            this.uniforms.set(p.name, { buffer: null, offset, size });
+            offset += 16; // Naive alignment (vec4 aligned)
+        });
+        const bufferSize = Math.max(offset, 16);
+        this.uniformBuffer = this.device.createBuffer({
+            size: bufferSize,
+            usage: GPUBufferUsage.UNIFORM | GPUBufferUsage.COPY_DST,
+            label: 'GlobalUniforms'
+        });
+        this.uniforms.forEach(u => u.buffer = this.uniformBuffer);
+    }
+    getUniformBuffer() {
+        return this.uniformBuffer;
+    }
+    // --- Scene Buffer ---
+    sceneBuffer = null;
+    createSceneBuffer() {
+        if (this.sceneBuffer)
+            return;
+        this.sceneBuffer = this.device.createBuffer({
+            size: 16, // vec2<u32> + vec2<f32> = 4+4 + 4+4 = 16 bytes
+            usage: GPUBufferUsage.UNIFORM | GPUBufferUsage.COPY_DST,
+            label: 'SceneInfo'
+        });
+    }
+    updateSceneBuffer(width, height) {
+        if (!this.sceneBuffer)
+            return;
+        if (width === 0 || height === 0)
+            return;
+        const data = new ArrayBuffer(16);
+        const u32 = new Uint32Array(data);
+        const f32 = new Float32Array(data);
+        u32[0] = width;
+        u32[1] = height;
+        f32[2] = 1.0 / width;
+        f32[3] = 1.0 / height;
+        this.device.queue.writeBuffer(this.sceneBuffer, 0, data);
+        console.log(`Updated scene buffer with inputSize=${u32[0]}, ${u32[1]} and InputPt=${f32[2]}, ${f32[3]}`);
+    }
+    getSceneBuffer() {
+        return this.sceneBuffer;
+    }
     dispose() {
-        this.textures.forEach(texture => texture.destroy());
-        /**
-         * - EN: Destroy all GPU textures.
-         * - TW: 銷毀所有 GPU 紋理。
-         */
-        this.uniforms.clear();
-        /**
-         * - EN: Clear uniform metadata.
-         * - TW: 清除 uniform 元資料。
-         */
+        this.textures.forEach(t => t.destroy());
+        this.textures.clear();
+        this.views.clear();
+        this.samplers.clear(); // Samplers are not destroyable in WebGPU spec but we clear ref
         if (this.uniformBuffer) {
             this.uniformBuffer.destroy();
-            /**
-             * - EN: Destroy the uniform buffer.
-             * - TW: 銷毀 uniform 緩衝區。
-             */
+            this.uniformBuffer = null;
         }
-        this.textures.clear();
-        /**
-         * - EN: Clear the texture map.
-         * - TW: 清除紋理映射。
-         */
-        this.samplers.clear();
-        /**
-         * - EN: Clear the sampler map.
-         * - TW: 清除取樣器映射。
-         */
-        /**
-         * - EN: All GPU resources destroyed.
-         * - TW: 所有 GPU 資源已銷毀。
-         */
-        console.log("ResourceManager: All GPU resources destroyed.");
+        if (this.sceneBuffer) {
+            this.sceneBuffer.destroy();
+            this.sceneBuffer = null;
+        }
+        this.uniforms.clear();
     }
 }
 
-// src/runtime/PipelineManager.js
-
-/**
- * - EN: Manages the creation and scheduling of WebGPU compute pipelines.
- * - TW: 管理 WebGPU 計算管線的建立和調度。
- */
 class PipelineManager {
+    device;
+    resourceManager;
+    pipelines;
     constructor(device, resourceManager) {
         this.device = device;
         this.resourceManager = resourceManager;
         this.pipelines = new Map();
-
-        // Setup uncaptured error handler for debugging
-        this.device.addEventListener('uncapturederror', event => {
-            console.error('WebGPU Uncaptured Error:', event.error.message);
-        });
     }
-
-    /**
-     * - EN: Asynchronously creates compute pipelines for all passes.
-     * - TW: 非同步建立所有通道的計算管線。
-     */
     async createPipelines(shaderInfo, generatedModules) {
         this.pipelines.clear();
-
         for (const module of generatedModules) {
-            const pass = shaderInfo.passes.find(p => p.index === module.passIndex);
-            if (!pass) {
-                console.warn(`PipelineManager: Pass ${module.passIndex} not found in shaderInfo.`);
+            const pass = shaderInfo.passes.find((p) => p.index === module.passIndex);
+            if (!pass)
                 continue;
-            }
-
-            console.log(`建立 Pass ${module.passIndex} 的管線...`);
-            console.log(`WGSL 程式碼長度: ${module.wgslCode.length} 字元`);
-
-            try {
-                // 1. Create GPUShaderModule with error scope
-                this.device.pushErrorScope('validation');
-
-                const shaderModule = this.device.createShaderModule({
-                    code: module.wgslCode,
-                    label: `Pass ${module.passIndex} Shader Module`
+            const shaderModule = this.device.createShaderModule({
+                code: module.wgslCode,
+                label: `Pass ${module.passIndex} Shader`
+            });
+            // Retrieve compilation info for debugging
+            shaderModule.getCompilationInfo().then(info => {
+                if (info.messages.length > 0) ;
+            });
+            const bindingMap = new Map();
+            // Defaults: Sampler @ 0
+            bindingMap.set(0, {
+                binding: 0,
+                visibility: GPUShaderStage.COMPUTE,
+                sampler: { type: 'filtering' }
+            });
+            // Uniforms @ 1
+            if (module.resources.parameters.length > 0) {
+                bindingMap.set(1, {
+                    binding: 1,
+                    visibility: GPUShaderStage.COMPUTE,
+                    buffer: { type: 'uniform' }
                 });
-
-                const shaderError = await this.device.popErrorScope();
-                if (shaderError) {
-                    console.error('Shader Module 建立錯誤:', shaderError.message);
-                    throw shaderError;
+            }
+            // Scene Info @ 4 (User Specified)
+            bindingMap.set(4, {
+                binding: 4,
+                visibility: GPUShaderStage.COMPUTE,
+                buffer: { type: 'uniform' }
+            });
+            // Textures
+            module.resources.textures.forEach((tex) => {
+                const format = 'rgba16float';
+                if (tex.isStorage) {
+                    bindingMap.set(tex.binding, {
+                        binding: tex.binding,
+                        visibility: GPUShaderStage.COMPUTE,
+                        storageTexture: { format: format, access: 'write-only' }
+                    });
                 }
-
-                // Check compilation info
-                const compilationInfo = await shaderModule.getCompilationInfo();
-                if (compilationInfo.messages.length > 0) {
-                    console.group(`Shader 編譯訊息 (Pass ${module.passIndex}):`);
-                    for (const msg of compilationInfo.messages) {
-                        const level = msg.type === 'error' ? 'ERROR' : msg.type === 'warning' ? 'WARN' : 'INFO';
-                        console.log(`${level} Line ${msg.lineNum}:${msg.linePos} - ${msg.message}`);
-
-                        // Show context
-                        if (msg.lineNum) {
-                            const lines = module.wgslCode.split('\n');
-                            const contextStart = Math.max(0, msg.lineNum - 2);
-                            const contextEnd = Math.min(lines.length, msg.lineNum + 2);
-                            console.log('Context:');
-                            for (let i = contextStart; i < contextEnd; i++) {
-                                const prefix = (i + 1) === msg.lineNum ? '>>> ' : '    ';
-                                console.log(`${prefix}${i + 1}: ${lines[i]}`);
-                            }
-                        }
-                    }
-                    console.groupEnd();
-
-                    // If there are errors, stop
-                    const hasErrors = compilationInfo.messages.some(m => m.type === 'error');
-                    if (hasErrors) {
-                        throw new Error(`Shader compilation failed with ${compilationInfo.messages.filter(m => m.type === 'error').length} error(s)`);
-                    }
+                else {
+                    bindingMap.set(tex.binding, {
+                        binding: tex.binding,
+                        visibility: GPUShaderStage.COMPUTE,
+                        texture: { sampleType: 'float' }
+                    });
                 }
-
-                console.log('Shader Module 建立成功');
-
-                // 2. Create GPUBindGroupLayout
-                const bindingMap = new Map();
-
-                // Add Samplers
-                module.resources.samplers.forEach(samp => {
-                    console.log(`Sampler "${samp.name}" -> @binding(${samp.binding})`);
+            });
+            // Extra samplers
+            module.resources.samplers.forEach((samp) => {
+                if (samp.binding !== 0) {
                     bindingMap.set(samp.binding, {
                         binding: samp.binding,
                         visibility: GPUShaderStage.COMPUTE,
-                        sampler: {type: 'filtering'}
-                    });
-                });
-
-                // Add Uniforms (binding 1 if present)
-                if (module.resources.parameters.length > 0) {
-                    console.log('Uniforms -> @binding(1)');
-                    bindingMap.set(1, {
-                        binding: 1,
-                        visibility: GPUShaderStage.COMPUTE,
-                        buffer: {type: 'uniform'}
+                        sampler: { type: 'filtering' }
                     });
                 }
-
-                // Add Textures
-                module.resources.textures.forEach(tex => {
-                    const texType = tex.isStorage ? 'storage' : 'sampled';
-                    const normalizedFormat = (tex.format || 'rgba8unorm').toLowerCase().replace(/_/g, '');
-                    console.log(`Texture "${tex.name}" (${texType}, ${normalizedFormat}) -> @binding(${tex.binding})`);
-
-                    if (tex.isStorage) {
-                        const validWriteStorageFormats = [
-                            'r32float', 'r32sint', 'r32uint',
-                            'rgba16float', 'rgba16sint', 'rgba16uint',
-                            'rgba32float', 'rgba32sint', 'rgba32uint',
-                            'rg32float', 'rg32sint', 'rg32uint'
-                        ];
-
-                        if (!validWriteStorageFormats.includes(normalizedFormat)) {
-                            console.error(`Invalid write storage texture format: ${normalizedFormat}`);
-                            throw new Error(
-                                `Texture "${tex.name}" has invalid storage format "${normalizedFormat}". ` +
-                                `Valid formats for write access: ${validWriteStorageFormats.join(', ')}`
-                            );
-                        }
-
-                        bindingMap.set(tex.binding, {
-                            binding: tex.binding,
-                            visibility: GPUShaderStage.COMPUTE,
-                            storageTexture: {
-                                format: normalizedFormat,
-                                access: 'write-only'
-                            }
-                        });
-                    } else {
-                        bindingMap.set(tex.binding, {
-                            binding: tex.binding,
-                            visibility: GPUShaderStage.COMPUTE,
-                            texture: {sampleType: 'float'}
-                        });
-                    }
-                });
-
-                const bindGroupLayoutEntries = Array.from(bindingMap.values())
-                    .sort((a, b) => a.binding - b.binding);
-
-                console.log(`BindGroupLayout entries (${bindGroupLayoutEntries.length} total)`);
-
-                this.device.pushErrorScope('validation');
-
-                const bindGroupLayout = this.device.createBindGroupLayout({
-                    entries: bindGroupLayoutEntries,
-                    label: `Pass ${module.passIndex} Bind Group Layout`
-                });
-
-                const layoutError = await this.device.popErrorScope();
-                if (layoutError) {
-                    console.error('BindGroupLayout 建立錯誤:', layoutError.message);
-                    throw layoutError;
-                }
-
-                console.log('BindGroupLayout 建立成功');
-
-                // 3. Create GPUPipelineLayout
-                this.device.pushErrorScope('validation');
-
-                const pipelineLayout = this.device.createPipelineLayout({
-                    bindGroupLayouts: [bindGroupLayout],
-                    label: `Pass ${module.passIndex} Pipeline Layout`
-                });
-
-                const pipelineLayoutError = await this.device.popErrorScope();
-                if (pipelineLayoutError) {
-                    console.error('PipelineLayout 建立錯誤:', pipelineLayoutError.message);
-                    throw pipelineLayoutError;
-                }
-
-                console.log('PipelineLayout 建立成功');
-
-                // 4. Create GPUComputePipeline
-                this.device.pushErrorScope('validation');
-
-                const computePipeline = await this.device.createComputePipelineAsync({
-                    layout: pipelineLayout,
-                    compute: {
-                        module: shaderModule,
-                        entryPoint: 'main_cs',
-                    },
-                    label: `Pass ${module.passIndex} Compute Pipeline`
-                });
-
-                const pipelineError = await this.device.popErrorScope();
-                if (pipelineError) {
-                    console.error('ComputePipeline 建立錯誤:', pipelineError.message);
-                    throw pipelineError;
-                }
-
-                await this.device.queue.submit([]);
-
-                console.log(`Pass ${module.passIndex} 管線建立成功`);
-
-                this.pipelines.set(module.passIndex, {
-                    shaderModule,
-                    bindGroupLayout,
-                    pipelineLayout,
-                    computePipeline,
-                    resources: module.resources,
-                    passInfo: pass
-                });
-
-            } catch (error) {
-                console.error(`Pass ${module.passIndex} 管線建立失敗:`, error);
-
-                console.group(`Pass ${module.passIndex} 完整 WGSL 程式碼:`);
-                const lines = module.wgslCode.split('\n');
-                lines.forEach((line, idx) => {
-                    console.log(`${(idx + 1).toString().padStart(4)}: ${line}`);
-                });
-                console.groupEnd();
-
-                throw error;
-            }
+            });
+            const entries = Array.from(bindingMap.values()).sort((a, b) => a.binding - b.binding);
+            const bindGroupLayout = this.device.createBindGroupLayout({ entries });
+            const pipelineLayout = this.device.createPipelineLayout({ bindGroupLayouts: [bindGroupLayout] });
+            const computePipeline = await this.device.createComputePipelineAsync({
+                layout: pipelineLayout,
+                compute: { module: shaderModule, entryPoint: 'main_cs' },
+                label: `Pass ${module.passIndex} Pipeline`
+            });
+            this.pipelines.set(module.passIndex, {
+                computePipeline, bindGroupLayout, resources: module.resources, passInfo: pass
+            });
         }
-
-        console.log(`成功建立 ${this.pipelines.size} 個管線`);
     }
-
-    /**
-     * - EN: Encodes commands to dispatch a specific compute pass.
-     * - TW: 編碼調度特定計算通道的命令。
-     */
     dispatchPass(passInfo, commandEncoder) {
-        const storedPipeline = this.pipelines.get(passInfo.index);
-        if (!storedPipeline) {
-            throw new Error(`找不到通道 ${passInfo.index} 的管線。是否已編譯?`);
+        const pipeline = this.pipelines.get(passInfo.index);
+        if (!pipeline)
+            throw new Error(`Pipeline for pass ${passInfo.index} not found`);
+        const { computePipeline, bindGroupLayout, resources, passInfo: originalPassInfo } = pipeline;
+        const groupEntries = [];
+        // 1. Defaut sampler
+        let defaultSampler = this.resourceManager.getSampler('sam');
+        if (!defaultSampler) {
+            // Create one if mostly needed or throw? Assuming it might exist or create temp
+            defaultSampler = this.device.createSampler({ magFilter: 'linear', minFilter: 'linear' });
         }
-
-        const {computePipeline, bindGroupLayout, resources, passInfo: originalPassInfo} = storedPipeline;
-
-        const bindingMap = new Map();
-
-        resources.samplers.forEach(samp => {
-            const sampler = this.resourceManager.getSampler(samp.name);
-            if (!sampler) {
-                if (samp.name === 'sam') {
-                    const defaultSampler = this.device.createSampler({
-                        magFilter: 'linear',
-                        minFilter: 'linear',
-                    });
-                    bindingMap.set(samp.binding, {
-                        binding: samp.binding,
-                        resource: defaultSampler
-                    });
-                } else {
-                    throw new Error(`Sampler ${samp.name} not found in ResourceManager.`);
-                }
-            } else {
-                bindingMap.set(samp.binding, {
-                    binding: samp.binding,
-                    resource: sampler
-                });
-            }
-        });
-
+        groupEntries.push({ binding: 0, resource: defaultSampler });
+        // 2. Uniforms
         if (resources.parameters.length > 0) {
-            const uniformBuffer = this.resourceManager.getUniformBuffer();
-            if (!uniformBuffer) {
-                throw new Error('Uniform buffer not found in ResourceManager.');
-            }
-            bindingMap.set(1, {
-                binding: 1,
-                resource: {buffer: uniformBuffer}
-            });
+            const ub = this.resourceManager.getUniformBuffer();
+            if (!ub)
+                throw new Error("Uniform buffer missing");
+            groupEntries.push({ binding: 1, resource: { buffer: ub } });
         }
-
-        resources.textures.forEach(tex => {
-            const texture = this.resourceManager.getTexture(tex.name);
-            if (!texture) {
-                throw new Error(`Texture ${tex.name} not found in ResourceManager.`);
-            }
-            bindingMap.set(tex.binding, {
-                binding: tex.binding,
-                resource: texture.createView()
-            });
+        // 3. Textures
+        resources.textures.forEach((tex) => {
+            const mode = tex.isStorage ? 'storage' : 'sampled';
+            const view = this.resourceManager.getTextureView(tex.name, mode);
+            groupEntries.push({ binding: tex.binding, resource: view });
         });
-
-        const bindGroupEntries = Array.from(bindingMap.values())
-            .sort((a, b) => a.binding - b.binding);
-
+        // 4. Other samplers
+        resources.samplers.forEach((samp) => {
+            if (samp.binding !== 0) {
+                const s = this.resourceManager.getSampler(samp.name);
+                if (s)
+                    groupEntries.push({ binding: samp.binding, resource: s });
+            }
+        });
+        // 5. Scene Info (Binding 4)
+        const sceneBuffer = this.resourceManager.getSceneBuffer();
+        if (sceneBuffer) {
+            groupEntries.push({ binding: 4, resource: { buffer: sceneBuffer } });
+        }
         const bindGroup = this.device.createBindGroup({
             layout: bindGroupLayout,
-            entries: bindGroupEntries,
-            label: `Pass ${passInfo.index} Bind Group`
+            entries: groupEntries
         });
-
         const passEncoder = commandEncoder.beginComputePass();
         passEncoder.setPipeline(computePipeline);
         passEncoder.setBindGroup(0, bindGroup);
-
-        const outputTextureName = originalPassInfo.out[0];
-        const outputTexture = this.resourceManager.getTexture(outputTextureName);
-        const workgroupSize = originalPassInfo.numThreads;
-
-        const dispatchX = Math.ceil(outputTexture.width / workgroupSize[0]);
-        const dispatchY = Math.ceil(outputTexture.height / workgroupSize[1]);
-
-        passEncoder.dispatchWorkgroups(dispatchX, dispatchY, 1);
+        const outName = originalPassInfo.out[0];
+        const outTex = this.resourceManager.getTexture(outName);
+        if (!outTex)
+            throw new Error("Output texture not found");
+        const workgroupSize = originalPassInfo.blockSize || originalPassInfo.numThreads;
+        // Use blockSize[0] (width) and blockSize[1] (height). If 1D array provided for block_size, parser handles it?
+        // Parser: data.blockSize.push(data.blockSize[0]) if length 1. So it's at least [w, h].
+        // numThreads is [x, y, z].
+        let blockW = workgroupSize[0];
+        let blockH = workgroupSize[1];
+        // Safety check if blockSize was 1D but parser didn't expand (it does).
+        // If numThreads (64, 1, 1), blockH is 1. If it's a 1D compute shader mapping to 2D, we rely on having valid blockSize.
+        if (!originalPassInfo.blockSize && originalPassInfo.numThreads[1] === 1 && outTex.height > 1) ;
+        const dx = Math.ceil(outTex.width / blockW);
+        const dy = Math.ceil(outTex.height / blockH);
+        console.log(`Dispatch Pass ${passInfo.index}: outTex=${outTex.width}x${outTex.height}, block=${blockW}x${blockH}, dispatch=${dx}x${dy}`);
+        passEncoder.dispatchWorkgroups(dx, dy, 1);
         passEncoder.end();
     }
-
     dispose() {
         this.pipelines.clear();
-        console.log('PipelineManager: All pipeline states cleared.');
     }
 }
 
-// src/runtime/WGSLCodeGenerator.js
-/**
- * - EN: Assembles a complete WGSL shader module from WGFX IR objects.
- * - TW: 從 WGFX IR 物件組裝完整的 WGSL 著色器模組。
- */
-
 class WGSLCodeGenerator {
-    constructor() {
-    }
-
-    /**
-     * - EN: Determines if a texture format is valid for Storage Texture write access
-     * - TW: 判斷紋理格式是否有效可用於 Storage Texture 寫入存取
-     */
-    _isValidStorageFormat(format) {
-        const validStorageFormats = [
-            'r32float', 'r32sint', 'r32uint',
-            'rgba16float', 'rgba16sint', 'rgba16uint',
-            'rgba32float', 'rgba32sint', 'rgba32uint',
-            'rg32float', 'rg32sint', 'rg32uint'
-        ];
-        return validStorageFormats.includes(format.toLowerCase().replace(/_/g, ''));
-    }
-
-    /**
-     * - EN: Upgrades texture format to a storage-compatible format
-     * - TW: 將紋理格式升級為相容於 Storage 的格式
-     */
-    _upgradeToStorageFormat(format) {
-        const normalizedFormat = format.toLowerCase().replace(/_/g, '');
-
-        // 8-bit formats must be upgraded to rgba16float for storage use
-        if (normalizedFormat === 'rgba8unorm' || normalizedFormat === 'bgra8unorm') {
-            return 'rgba16float';
-        }
-
-        // 16-bit formats are already valid
-        if (normalizedFormat.includes('rgba16') || normalizedFormat.includes('r16')) {
-            return normalizedFormat;
-        }
-
-        // 32-bit formats are already valid
-        if (normalizedFormat.includes('32')) {
-            return normalizedFormat;
-        }
-
-        // Default fallback: upgrade to rgba16float
-        console.warn(`Unknown format "${format}" upgraded to rgba16float for storage texture compatibility`);
-        return 'rgba16float';
-    }
-
-    /**
-     * - EN: Preprocesses pass code to fix WGSL type errors and syntax issues.
-     * - TW: 預處理通道程式碼以修正 WGSL 型別錯誤和語法問題。
-     */
+    constructor() { }
     _preprocessPassCode(passCode, passIndex) {
         let processedCode = passCode;
-
         // Fix WGSL type error: vec2<u32> + f32
         processedCode = processedCode.replace(/\(gxy \+ 0\.5f\)/g, '(MF2(gxy) + 0.5f)');
-
-        // Replace threadId.x with local_id.x
         processedCode = processedCode.replace(/threadId\.x/g, 'local_id.x');
-
-        // Apply gxy fixes based on passIndex
-        if (passIndex === 1) {
-            processedCode = processedCode.replace(
-                /let gxy = \(Rmp8x8\(local_id\.x\) << 1u\) \+ workgroup_id\.xy;/,
-                'let gxy = (Rmp8x8(local_id.x) * 2u) + workgroup_id.xy;'
-            );
-        } else if (passIndex >= 2 && passIndex <= 7) {
-            processedCode = processedCode.replace(
-                /let gxy: uint2\s*=\s*Rmp8x8\(local_id\.x\) \+ blockStart;/,
-                'let gxy: uint2 = Rmp8x8(local_id.x) + workgroup_id.xy * 8u;'
-            );
-        } else if (passIndex === 8) {
-            processedCode = processedCode.replace(
-                /let gxy: uint2 = Rmp8x8\(local_id\.x\) \+ workgroup_id\.xy;/,
-                'let gxy: uint2 = Rmp8x8(local_id.x) + workgroup_id.xy * 8u;'
-            );
+        // Fix undefined 'blockStart'
+        // This is a common variable in Anime4K shaders, usually derived from workgroup_id
+        // We handle injection in generate() for robustness.
+        // Better strategy: Replace usage if it's a simple addition
+        // Or ensure we inject the let definition after the function opening brace.
+        // Legacy fixes (simplified for readability, keeping core logic)
+        if (passIndex >= 1) {
+            // Fix vector shift: (vec2<u32> << u32) -> (vec2<u32> << vec2<u32>(u32))
+            // Matches: (Rmp8x8(local_id.x) << 1u)
+            processedCode = processedCode.replace(/(Rmp8x8\(local_id\.x\)\s*<<\s*)(\d+u)/g, '$1vec2<u32>($2)');
         }
-
         // Fix variable redeclarations
-        processedCode = processedCode.replace(
-            /var\s+(a1|b1|c1|d1|e1|f1|g1|h1|i1|na1|nb1|nc1|nd1|ne1|nf1|ng1|nh1|ni1|na2|nb2|nc2|nd2|ne2|nf2|ng2|nh2|ni2|na3|nb3|nc3|nd3|ne3|nf3|ng3|nh3|ni3)\s+=\s+max\(\1,\s+MF4\(0\.0\)\);/g,
-            '$1 = max($1, MF4(0.0));'
-        );
-
+        processedCode = processedCode.replace(/var\s+([a-z0-9]+)\s+=\s+max\(\1,\s+MF4\(0\.0\)\);/g, '$1 = max($1, MF4(0.0));');
         return processedCode;
     }
-
-    /**
-     * - EN: Assembles final WGSL shader modules from parsed shader information (IR).
-     * - TW: 從解析後的著色器資訊 (IR) 組裝最終的 WGSL 著色器模組。
-     */
     generate(shaderInfo) {
         const generatedModules = [];
-
-        // Inject common code block
         const commonCode = shaderInfo.commonCode
-            ? `// --- 通用程式碼 ---\n${shaderInfo.commonCode}\n\n`
+            ? `// --- COMMON ---\n${shaderInfo.commonCode}\n\n`
             : '';
-
-        // Generate uniform buffer structure if parameters exist
         let uniformBufferCode = '';
         if (shaderInfo.parameters.length > 0) {
             uniformBufferCode += `struct Uniforms {\n`;
             shaderInfo.parameters.forEach(p => {
                 const type = p.type === 'int' ? 'i32' : 'f32';
                 uniformBufferCode += `    ${p.name}: ${type},\n`;
+                // Add padding if necessary for std140 (simplified behavior here)
+                uniformBufferCode += `    _pad_${p.name}_1: f32,\n`;
+                uniformBufferCode += `    _pad_${p.name}_2: f32,\n`;
+                uniformBufferCode += `    _pad_${p.name}_3: f32,\n`;
             });
             uniformBufferCode += `};\n`;
             uniformBufferCode += `@group(0) @binding(1) var<uniform> uniforms: Uniforms;\n\n`;
         }
+        // SceneInfo struct and binding (binding 4)
+        const sceneInfoCode = `struct SceneInfo {
+    inputSize: vec2<u32>,
+    inputPt: vec2<f32>,
+}
+@group(0) @binding(4) var<uniform> scene: SceneInfo;
 
-        // Process each pass
+`;
         shaderInfo.passes.forEach(pass => {
-            let wgsl = `// 由 WGFX 組裝器生成 - 時間戳記: ${Date.now()} - Pass ${pass.index}\n\n`;
+            let wgsl = `// Pass ${pass.index}\n\n`;
             wgsl += commonCode;
-
-            // Declare default sampler
-            wgsl += `@group(0) @binding(0) var sam: sampler;\n\n`;
+            // Only inject default sampler if not already defined in COMMON
+            if (!commonCode.includes('var sam:') && !commonCode.includes('var sam :')) {
+                wgsl += `@group(0) @binding(0) var sam: sampler;\n\n`;
+            }
             wgsl += uniformBufferCode;
-
-            // Initialize resource tracking
+            // Only inject SceneInfo if not already defined in COMMON
+            if (!commonCode.includes('SceneInfo')) {
+                wgsl += sceneInfoCode;
+            }
             const passResources = {
                 textures: [],
                 samplers: [],
-                parameters: shaderInfo.parameters
+                parameters: shaderInfo.parameters,
+                hasScene: true
             };
-
-            // Add default sampler
-            passResources.samplers.push({
-                name: 'sam',
-                binding: 0,
-                group: 0,
-                filter: 'LINEAR'
-            });
-
-            // Collect textures and samplers used by this pass
-            const usedTextureNames = new Set([...pass.in, ...pass.out]);
-
-            // Add globally declared samplers
+            passResources.samplers.push({ name: 'sam', binding: 0, group: 0 });
+            // Add other samplers
             shaderInfo.samplers.forEach(resource => {
                 if (resource.name !== 'sam' && !passResources.samplers.some(s => s.name === resource.name)) {
                     passResources.samplers.push(resource);
                 }
             });
-
-            // Allocate bindings (sam:0, uniforms:1 if exists, then textures/samplers from 2 or 1)
-            let bindingIndex = (shaderInfo.parameters.length > 0) ? 2 : 1;
-
-            // Process textures
+            // Start bindings at 6 to avoid collision with SceneInfo (Binding 4)
+            // 0: Sampler, 1: Uniforms, 4: SceneInfo
+            // Reserved: 2, 3, 5 (Future use?)
+            let bindingIndex = 6;
+            const usedTextureNames = new Set([...pass.in, ...pass.out]);
             shaderInfo.textures.forEach(tex => {
-                // Check if this texture is used by this pass
-                const isUsed = [...usedTextureNames].some(usedName =>
-                    tex.name === usedName || tex.name.startsWith(usedName + "_")
-                );
-
-                if (!isUsed) return;
-
-                // Determine texture usage (Sampled vs Storage)
+                const isUsed = [...usedTextureNames].some(usedName => tex.name === usedName || tex.name.startsWith(usedName + "_"));
+                if (!isUsed)
+                    return;
                 const isOutputInThisPass = pass.out.includes(tex.name);
                 let isStorage = false;
-
-                if (tex.name === 'OUTPUT') {
+                if (tex.name === 'OUTPUT')
                     isStorage = true;
-                } else if (tex.name === 'INPUT') {
-                    isStorage = false; // INPUT is always read-only (Sampled)
-                } else if (isOutputInThisPass) {
-                    isStorage = true; // Output textures must be Storage
-                } else {
-                    isStorage = false; // Other cases (inputs) are Sampled
-                }
-
-                // Process format and compatibility
-                let format = (tex.format || 'rgba8unorm').toLowerCase().replace(/_/g, '');
-
-                // CRITICAL FIX: Upgrade format for storage textures
-                if (isStorage) {
-                    const originalFormat = format;
-                    format = this._upgradeToStorageFormat(format);
-
-                    if (originalFormat !== format) {
-                        console.log(`Pass ${pass.index}: Upgraded texture "${tex.name}" format from ${originalFormat} to ${format} for storage compatibility`);
-                    }
-
-                    // Double-check format validity
-                    if (!this._isValidStorageFormat(format)) {
-                        console.error(`Pass ${pass.index}: Invalid storage format "${format}" for texture "${tex.name}"`);
-                        throw new Error(`Texture "${tex.name}" has invalid storage format "${format}". Valid formats: r32float, rgba16float, rgba32float, etc.`);
-                    }
-                }
-
-                // Generate WGSL texture declaration
+                else if (tex.name === 'INPUT')
+                    isStorage = false;
+                else if (isOutputInThisPass)
+                    isStorage = true;
+                else
+                    isStorage = false;
+                // Unified format
+                const format = 'rgba16float';
                 let textureType;
                 if (isStorage) {
                     textureType = `texture_storage_2d<${format}, write>`;
-                } else {
+                }
+                else {
                     textureType = `texture_2d<f32>`;
                 }
-
                 const currentBinding = bindingIndex++;
                 wgsl += `@group(0) @binding(${currentBinding}) var ${tex.name}: ${textureType};\n`;
-
-                // Store resource info with corrected format
                 passResources.textures.push({
                     ...tex,
-                    format: format, // Use corrected format
+                    format: format,
                     binding: currentBinding,
                     group: 0,
                     isStorage: isStorage
                 });
             });
-
-            // Declare additional samplers (excluding 'sam')
+            // Samplers bindings
             shaderInfo.samplers.forEach(samp => {
                 if (samp.name !== 'sam') {
                     const currentBinding = bindingIndex++;
@@ -1815,373 +1304,119 @@ class WGSLCodeGenerator {
                 }
             });
             wgsl += '\n';
-
-            // Append pass code
-            wgsl += `// --- 通道 ${pass.index} ---\n`;
-
-            // Remove //! directives and preprocess
+            // Pass code
             let processedPassCode = pass.code.replace(/\/\/!.*\n/g, '');
             processedPassCode = this._preprocessPassCode(processedPassCode, pass.index);
-
-            // Set workgroup size
             const numThreads = pass.numThreads || [1, 1, 1];
-
-            // Remove existing @compute or @workgroup_size attributes
             processedPassCode = processedPassCode.replace(/@compute\s*@workgroup_size\([^)]+\)\s*/g, '');
-
-            // Standardize entry point name
-            const passFunctionSignatureRegex = new RegExp(`fn Pass${pass.index}`);
-            processedPassCode = processedPassCode.replace(
-                passFunctionSignatureRegex,
-                `fn main_cs `
-            );
-
-            // Prepend attributes
+            processedPassCode = processedPassCode.replace(new RegExp(`fn Pass${pass.index}`), `fn main_cs `);
+            // Inject 'blockStart' definition if used
+            if (processedPassCode.includes('blockStart') && !processedPassCode.includes('let blockStart')) {
+                // Try to inject execution logic at start of function
+                processedPassCode = processedPassCode.replace(/\{/, '{\n    let blockStart = workgroup_id.xy * 8u;');
+            }
             processedPassCode = `@compute @workgroup_size(${numThreads[0]}, ${numThreads[1]}, ${numThreads[2]}) ${processedPassCode}`;
-
             wgsl += processedPassCode;
-
-            // Store generated module
             generatedModules.push({
-                wgslCode: wgsl.replace(/\r\n/g, '\n'),
+                wgslCode: wgsl,
                 passIndex: pass.index,
                 resources: passResources
             });
         });
-
         return generatedModules;
     }
 }
 
-// src/runtime/UniformBinder.js
-
-/**
- * @fileoverview
- * - EN: Handles dynamic updates of uniform buffers.
- *   This class provides a simple API for changing uniform values at runtime.
- * - TW: 處理統一緩衝區的動態更新。
- *   此類別提供一個簡單的 API，用於在運行時更改統一值。
- */
-
-let GPUDevice;
-
-/**
- * - EN: In a Node.js environment, native WebGPU objects don't exist.
- *   We check for their existence on the global scope. If they don't exist,
- *   `GPUDevice` will remain `undefined`, which is safe for the CLI code path
- *   as it doesn't instantiate or use any GPU-related objects.
- * - TW: 在 Node.js 環境中，原生 WebGPU 物件不存在。
- *   我們檢查它們是否在全域範圍內存在。如果不存在，
- *   `GPUDevice` 將保持 `undefined`，這對於 CLI 程式碼路徑是安全的，
- *   因為它不實例化或使用任何與 GPU 相關的物件。
- */
-try {
-    /**
-     * - EN: This will only succeed in a browser-like environment with WebGPU support.
-     * - TW: 這只會在支援 WebGPU 的瀏覽器環境中成功。
-     */
-    if (globalThis.GPUDevice) {
-        GPUDevice = globalThis.GPUDevice;
-    }
-    /**
-     * - EN: In Node.js or a non-WebGPU environment, this will remain undefined.
-     * - TW: 在 Node.js 或非 WebGPU 環境中，這將保持未定義。
-     */
-} catch (e) {
-    /**
-     * - EN: Ignore any errors during this detection phase.
-     * - TW: 在此檢測階段忽略任何錯誤。
-     */
-}
-
-
 class UniformBinder {
-    /**
-     * @param {GPUDevice} [device]
-     * - EN: The active WebGPU device.
-     * - TW: 作用中的 WebGPU 裝置。
-     * @param {import('./ResourceManager.js').ResourceManager} resourceManager
-     * - EN: An instance of the resource manager.
-     * - TW: 資源管理器的實例。
-     */
+    device;
+    resourceManager;
     constructor(device, resourceManager) {
-        this.device = device || new GPUDevice();
-        /**
-         * - EN: Use provided device or a mock device.
-         * - TW: 使用提供的裝置或模擬裝置。
-         */
+        this.device = device;
         this.resourceManager = resourceManager;
     }
-
-    /**
-     * - EN: Dynamically updates the value of a single uniform in the shared uniform buffer.
-     * - TW: 在共享統一緩衝區中動態更新單個統一的值。
-     * @param {string} name
-     * - EN: The name of the uniform to update (e.g., `Strength`).
-     * - TW: 要更新的統一名稱 (例如：`Strength`)。
-     * @param {number} value
-     * - EN: The new numeric value for the uniform.
-     * - TW: 統一的新數值。
-     */
     updateUniform(name, value) {
-        /**
-         * - EN: Retrieve uniform metadata (buffer, offset, size) from the resource manager.
-         * - TW: 從資源管理器獲取統一的元資料 (緩衝區、偏移量、大小)。
-         */
-        const uniformInfo = this.resourceManager.getUniform(name);
-        if (!uniformInfo) {
-            console.warn(`Uniform '${name}' not found. Cannot update. / 找不到統一 '${name}'。無法更新。`);
+        const metadata = this.resourceManager.getUniform(name);
+        if (!metadata) {
+            console.warn(`Uniform ${name} not found`);
             return;
         }
-
-        const {buffer, offset, size} = uniformInfo;
-
-        /**
-         * - EN: Create a temporary typed array with the new value.
-         *   This implementation simplifies things, assuming all uniforms are 4-byte floats.
-         *   A more robust solution would check the parameter type from the IR.
-         * - TW: 使用新值建立一個臨時的類型化陣列。
-         *   此實作簡化了事情，假設所有統一都是 4 位元組浮點數。
-         *   更穩健的解決方案將檢查 IR 中的參數類型。
-         */
-        const data = new Float32Array([value]);
-
-        if (data.byteLength > size) {
-            console.error(`Data size mismatch for uniform '${name}'. Expected ${size}, but got ${data.byteLength}. / 統一 '${name}' 的資料大小不匹配。預期為 ${size}，但得到 ${data.byteLength}。`);
-            return;
+        const { buffer, offset, size } = metadata;
+        let data;
+        // Naive type check assuming float for now, ideally strictly typed in metadata
+        if (Array.isArray(value)) {
+            data = new Float32Array(value);
         }
-
-        /**
-         * - EN: Write the data to the correct position in the GPU buffer.
-         * - TW: 將資料寫入 GPU 緩衝區中的正確位置。
-         */
-        this.device.queue.writeBuffer(
-            buffer,
-            /**
-             * - EN: Destination buffer.
-             * - TW: 目標緩衝區。
-             */
-            offset,
-            /**
-             * - EN: Byte offset to start writing from.
-             * - TW: 開始寫入的位元組偏移量。
-             */
-            data,
-            /**
-             * - EN: Source data.
-             * - TW: 來源資料。
-             */
-            0,
-            /**
-             * - EN: Offset within the source data.
-             * - TW: 來源資料中的偏移量。
-             */
-            size
-            /**
-             * - EN: Number of bytes to write.
-             * - TW: 要寫入的位元組數。
-             */
-        );
+        else {
+            data = new Float32Array([value]);
+        }
+        // Write to buffer
+        this.device.queue.writeBuffer(buffer, offset, data.buffer, data.byteOffset, data.byteLength);
     }
 }
 
-// src/runtime/WGFXRuntime.js
-
-
+/// <reference types="@webgpu/types" />
 class WGFXRuntime {
-    /**
-     * @param {GPUDevice} device
-     * - EN: The active WebGPU device.
-     * - TW: 作用中的 WebGPU 裝置。
-     */
+    device;
+    resourceManager;
+    pipelineManager;
+    wgslCodeGenerator;
+    uniformBinder;
+    shaderInfo;
     constructor(device) {
         if (!device) {
-            /**
-             * - EN: WGFXRuntime requires a valid WebGPU device. No device provided.
-             * - TW: WGFXRuntime 需要一個有效的 WebGPU 裝置。未提供裝置。
-             */
-            throw new Error("WGFXRuntime requires a valid WebGPU device. No device provided.");
+            throw new Error("WGFXRuntime requires a valid WebGPU device.");
         }
         this.device = device;
-
-        /**
-         * - EN: Instantiate all necessary sub-modules.
-         * - TW: 實例化所有必要的子模組。
-         */
-        // this.parser = new ShaderParser(); // No longer needed
         this.resourceManager = new ResourceManager(this.device);
         this.pipelineManager = new PipelineManager(this.device, this.resourceManager);
         this.wgslCodeGenerator = new WGSLCodeGenerator();
         this.uniformBinder = new UniformBinder(this.device, this.resourceManager);
-
-        /**
-         * - EN: Intermediate representation of the currently compiled shader.
-         * - TW: 當前編譯著色器的中介表示。
-         * @type {import('./ShaderParser.js').WGFXShaderInfo | null}
-         */
         this.shaderInfo = null;
     }
-
-    /**
-     * - EN: Compiles a WGFX effect from a code string. This is the main entry point for setting up a new effect.
-     *   The process involves parsing, code generation, resource allocation, and pipeline creation.
-     * - TW: 從程式碼字串編譯 WGFX 效果。這是設定新效果的主要入口點。
-     *   該過程涉及解析、程式碼生成、資源分配和管線建立。
-     * @param {string} effectCode
-     * - EN: The string containing the entire WGFX effect code.
-     * - TW: 包含整個 WGFX 效果程式碼的字串。
-     * @returns {Promise<void>}
-     * - EN: A Promise that resolves when compilation is complete.
-     * - TW: 編譯完成時解析的 Promise。
-     */
     async compile(effectCode, externalResources = {}) {
-        // FIXME: This is a temporary solution to pass external resources.
-        // A more robust solution would be to have a dedicated method to set resources.
-        /**
-         * - EN: Starting effect compilation.
-         * - TW: 開始效果編譯。
-         */
         console.log("WGFXRuntime: Starting effect compilation.");
-        /**
-         * - EN: 1. Parse the FX file to get the Intermediate Representation (IR).
-         * - TW: 1. 解析 FX 檔案以獲取中介表示 (IR)。
-         */
-        this.shaderInfo = peg$parse(effectCode);
-        /**
-         * - EN: ShaderInfo (IR) parsed.
-         * - TW: 已解析 ShaderInfo (IR)。
-         */
-        console.log("WGFXRuntime: ShaderInfo (IR) parsed:", this.shaderInfo);
-        /**
-         * - EN: 2. Generate a single WGSL shader module from the IR.
-         * - TW: 2. 從 IR 生成單個 WGSL 著色器模組。
-         */
-        const generatedModules = this.wgslCodeGenerator.generate(this.shaderInfo);
-        // if (this.parser.debug) {
-        //     /**
-        //      * - EN: Old debug check removed
-        //      * - TW: 舊的調試檢查已移除
-        //      */
-        //     console.log("WGFXRuntime: Generated WGSL module:", generatedModules);
-        // }
-
-        /**
-         * - EN: 3. Initialize all GPU resources (textures, samplers, buffers) based on the IR.
-         * - TW: 3. 根據 IR 初始化所有 GPU 資源 (紋理、取樣器、緩衝區)。
-         */
-        this.resourceManager.initialize(this.shaderInfo, externalResources);
-        /**
-         * - EN: Resources initialized.
-         * - TW: 資源已初始化。
-         */
-        console.log("WGFXRuntime: Resources initialized.");
-        /**
-         * - EN: 4. Create compute pipelines for each pass.
-         * - TW: 4. 為每個通道建立計算管線。
-         */
-        await this.pipelineManager.createPipelines(this.shaderInfo, generatedModules);
-        /**
-         * - EN: Pipelines created.
-         * - TW: 管線已建立。
-         */
-        console.log("WGFXRuntime: Pipelines created.");
-        /**
-         * - EN: Compilation complete.
-         * - TW: 編譯完成。
-         */
-        console.log("WGFXRuntime: Compilation complete.");
+        try {
+            const shaderInfo = peg$parse(effectCode);
+            this.shaderInfo = shaderInfo;
+            console.log("WGFXRuntime: ShaderInfo parsed");
+            const generatedModules = this.wgslCodeGenerator.generate(shaderInfo);
+            this.resourceManager.initialize(shaderInfo, externalResources);
+            console.log("WGFXRuntime: Resources initialized.");
+            await this.pipelineManager.createPipelines(shaderInfo, generatedModules);
+            console.log("WGFXRuntime: Pipelines created.");
+            console.log("WGFXRuntime: Compilation complete.");
+        }
+        catch (e) {
+            console.error("WGFXRuntime: Parse/Compile error", e);
+            throw e;
+        }
     }
-
-    /**
-     * - EN: Encodes commands to dispatch a specific compute pass.
-     * - TW: 編碼調度特定計算通道的命令。
-     * @param {string} passName
-     * - EN: The name of the pass to dispatch (e.g., `PASS_1`).
-     * - TW: 要調度的通道名稱 (例如：`PASS_1`)。
-     * @param {GPUCommandEncoder} commandEncoder
-     * - EN: The command encoder for the current frame.
-     * - TW: 當前幀的命令編碼器。
-     */
     dispatchPass(passName, commandEncoder) {
         if (!this.shaderInfo) {
-            /**
-             * - EN: Effect not compiled. Call compile() first.
-             * - TW: 效果未編譯。請先呼叫 compile()。
-             */
             throw new Error("Effect not compiled. Call compile() first.");
         }
-
-        /**
-         * - EN: Look up the corresponding pass information from the IR.
-         * - TW: 從 IR 中查找對應的通道資訊。
-         */
         const passIndex = parseInt(passName.split('_')[1], 10);
         const passInfo = this.shaderInfo.passes.find(p => p.index === passIndex);
         if (!passInfo) {
-            /**
-             * - EN: Pass `passName` not found in shader information.
-             * - TW: 在著色器資訊中找不到通道 `passName`。
-             */
-            throw new Error(`Pass "${passName}" not found in shader information.`);
+            throw new Error(`Pass "${passName}" not found.`);
         }
-
-        /**
-         * - EN: Delegate the actual dispatch logic to the pipeline manager.
-         * - TW: 將實際的調度邏輯委託給管線管理器。
-         */
         this.pipelineManager.dispatchPass(passInfo, commandEncoder);
     }
-
-    /**
-     * - EN: Updates the value of a uniform parameter in the GPU buffer.
-     * - TW: 更新 GPU 緩衝區中 uniform 參數的值。
-     * @param {string} name
-     * - EN: The name of the uniform to update.
-     * - TW: 要更新的 uniform 名稱。
-     * @param {number} value
-     * - EN: The new value for the uniform.
-     * - TW: uniform 的新值。
-     */
     updateUniform(name, value) {
         if (!this.shaderInfo) {
-            /**
-             * - EN: Effect not compiled. Call compile() first.
-             * - TW: 效果未編譯。請先呼叫 compile()。
-             */
             throw new Error("Effect not compiled. Call compile() first.");
         }
         this.uniformBinder.updateUniform(name, value);
     }
-
-    /**
-     * - EN: Gets the GPUTextureView of the final output texture, usually named 'OUTPUT'.
-     * - TW: 獲取最終輸出紋理的 GPUTextureView，通常命名為 'OUTPUT'。
-     * @returns {GPUTextureView}
-     * - EN: The texture view of the final output.
-     * - TW: 最終輸出的紋理視圖。
-     */
     getOutput() {
         const outputTexture = this.resourceManager.getTexture('OUTPUT');
         if (!outputTexture) {
-            /**
-             * - EN: Output texture `OUTPUT` not found in ResourceManager. Ensure it is correctly defined or managed.
-             * - TW: 在 ResourceManager 中找不到輸出紋理 `OUTPUT`。請確保已正確定義或管理。
-             */
-            throw new Error("Output texture 'OUTPUT' not found in ResourceManager. Ensure it is correctly defined or managed.");
+            throw new Error("Output texture 'OUTPUT' not found.");
         }
+        // Always return usage=TextureBinding/StorageBinding compatible view?
+        // Usually output to screen, so sampled view might be enough, but check usage
         return outputTexture.createView();
     }
-
-    /**
-     * - EN: Utility function to get raw GPU resources.
-     * - TW: 獲取原始 GPU 資源的實用函數。
-     * @param {string} name
-     * - EN: The name of the resource.
-     * - TW: 資源的名稱。
-     * @returns {GPUTexture | GPUSampler | GPUBuffer | undefined}
-     * - EN: The underlying GPU resource.
-     * - TW: 底層 GPU 資源。
-     */
     getResource(name) {
         return this.resourceManager.getTexture(name)
             || this.resourceManager.getSampler(name)
@@ -2189,145 +1424,163 @@ class WGFXRuntime {
     }
 }
 
-// src/WGFX.js
-
-/**
- * @fileoverview
- * - EN: The primary public interface for interacting with WGFX effects.
- *   It encapsulates the setup, initialization, and per-frame processing logic.
- * - TW: 用於與 WGFX 效果互動的主要公共接口。
- *   它封裝了設定、初始化和每幀處理邏輯。
- */
-
 class WGFX {
-    /**
-     * @param {WGFXRuntime} runtime
-     * - EN: The internal runtime instance managing GPU resources and pipelines.
-     * - TW: 管理 GPU 資源和管線的內部運行時實例。
-     */
+    runtime;
+    initialized;
+    width;
+    height;
+    currentInputSource;
     constructor(runtime) {
         this.runtime = runtime;
         this.initialized = false;
-        // WGFXSession has been renamed to WGFX for the public interface
+        this.currentInputSource = null;
+        this.width = 0;
+        this.height = 0;
     }
-
-    /**
-     * - EN: Asynchronously creates and compiles a new WGFX effect instance.
-     * - TW: 異步建立並編譯一個新的 WGFX 效果實例。
-     * @param {object} options
-     * @param {GPUDevice} options.device - The active WebGPU device.
-     * @param {string} options.effectCode - The source code of the WGFX effect.
-     * @param {object} [options.externalResources={}] - Predefined external resources like 'INPUT' or 'OUTPUT' textures.
-     * @returns {Promise<WGFX>} - The initialized WGFX instance.
-     */
-    static async create({device, effectCode, externalResources = {}}) {
-        // 1. Initialize Runtime
+    static async create({ device, effectCode, width, height }) {
+        if (!device) {
+            throw new Error('Must provide a valid GPUDevice');
+        }
+        if (!effectCode || typeof effectCode !== 'string') {
+            throw new Error('Must provide valid effectCode string');
+        }
+        if (!width || !height || width <= 0 || height <= 0) {
+            throw new Error('Width and height must be positive numbers');
+        }
         const runtime = new WGFXRuntime(device);
-
-        // 2. Compile and set up all resources and pipelines
-        // NOTE: externalResources are passed to the resourceManager during compile.
-        await runtime.compile(effectCode, externalResources);
-
-        // 3. Return the public interface instance
-        return new WGFX(runtime);
-    }
-
-    /**
-     * - EN: First pass: Initializes the session and returns UI metadata for controls.
-     * - TW: 第一輪：初始化會話並回傳用於 UI 控制的元資料。
-     * @returns {object} - Metadata describing uniforms, input textures, and output format.
-     */
-    initialize() {
-        if (this.initialized) {
-            throw new Error("WGFX instance already initialized.");
-        }
-
-        const shaderInfo = this.runtime.shaderInfo;
-
-        if (!shaderInfo) {
-            throw new Error("Shader not compiled. Call create() first.");
-        }
-
-        // Determine output format (simplified: assuming 'OUTPUT' texture is available)
-        const outputTexture = this.runtime.resourceManager.getTexture('OUTPUT');
-        const outputFormat = outputTexture?.format; // Assuming format is available on mock/real texture
-
-        const metadata = {
-            // Uniforms are referred to as 'parameters' in the internal IR
-            uniforms: shaderInfo.parameters.map(u => ({
-                name: u.name,
-                type: u.type,
-                default: u.defaultValue,
-                min: u.min ?? null,
-                max: u.max ?? null
-            })),
-            inputTextures: shaderInfo.textures
-                .filter(t => t.role === 'input')
-                .map(t => ({
-                    name: t.name,
-                    type: 'videoFrame' // Specific role hint for external binding
-                })),
-            output: {
-                name: 'OUTPUT',
-                format: outputFormat
+        // 2. Prepare external resources
+        const externalResources = {
+            defines: {
+                INPUT_WIDTH: width,
+                INPUT_HEIGHT: height
+            },
+            textures: {
+                INPUT: {
+                    size: [width, height],
+                    format: 'rgba8unorm',
+                    usage: GPUTextureUsage.TEXTURE_BINDING |
+                        GPUTextureUsage.COPY_DST |
+                        GPUTextureUsage.RENDER_ATTACHMENT
+                },
+                OUTPUT: {
+                    size: [width, height],
+                    format: 'rgba16float',
+                    usage: GPUTextureUsage.STORAGE_BINDING |
+                        GPUTextureUsage.COPY_SRC |
+                        GPUTextureUsage.TEXTURE_BINDING
+                }
             }
         };
-
-        this.initialized = true;
-        console.log("WGFX: Initialization complete. Metadata returned.");
-        return metadata;
+        try {
+            await runtime.compile(effectCode, externalResources);
+        }
+        catch (error) {
+            console.error('WGFX compilation failed:', error);
+            throw new Error(`Shader compilation error: ${error.message}`);
+        }
+        const instance = new WGFX(runtime);
+        instance.width = width;
+        instance.height = height;
+        instance.initialized = true;
+        console.log(`WGFX initialized: ${width}x${height}`);
+        return instance;
     }
-
-    /**
-     * - EN: Second pass: Processes a single frame using provided uniforms.
-     * - TW: 第二輪：使用提供的 uniform 處理單個影格。
-     * @param {object} options
-     * @param {ImageBitmap | VideoFrame | HTMLCanvasElement} options.frameBitmap - The input video frame or image data.
-     * @param {object<string, number>} options.uniforms - Key-value pairs of uniform names and their current values.
-     * @returns {GPUTextureView} - The texture view of the final processed output ('OUTPUT').
-     */
-    async processFrame({frameBitmap, uniforms}) {
+    initialize() {
         if (!this.initialized) {
-            throw new Error("WGFX instance not initialized. Call initialize() first.");
+            throw new Error('Instance not initialized, use WGFX.create()');
         }
-
-        // 1. Upload video frame to the 'INPUT' texture
-        // Note: We need to assume ResourceManager has a method to handle this upload.
-        // I will add a placeholder method to ResourceManager for this logic.
-        this.runtime.resourceManager.updateTextureFromImage(
-            'INPUT',
-            frameBitmap
-        );
-
-        // 2. Update uniforms using the UniformBinder
+        const shaderInfo = this.runtime.shaderInfo;
+        if (!shaderInfo)
+            throw new Error("Shader info missing");
+        return {
+            width: this.width,
+            height: this.height,
+            uniforms: shaderInfo.parameters.map((p) => ({
+                name: p.name,
+                type: p.type || 'f32',
+                default: (Array.isArray(p.default) ? p.default[0] : p.default) ?? 0.0,
+                min: p.min ?? 0.0,
+                max: p.max ?? 1.0,
+                step: p.step ?? 0.01
+            })),
+            passes: shaderInfo.passes.length
+        };
+    }
+    updateUniforms(uniforms) {
+        if (!this.initialized) {
+            throw new Error('Instance not initialized');
+        }
+        if (!uniforms || typeof uniforms !== 'object') {
+            console.warn('updateUniforms: Invalid uniforms object');
+            return;
+        }
         for (const [name, value] of Object.entries(uniforms)) {
-            this.runtime.updateUniform(name, value);
+            try {
+                this.runtime.updateUniform(name, value);
+            }
+            catch (error) {
+                console.warn(`Failed to update uniform "${name}":`, error.message);
+            }
         }
-
-        // 3. Execute all passes
-        const commandEncoder = this.runtime.device.createCommandEncoder();
-
-        // Loop through passes defined in the shader IR
-        for (const pass of this.runtime.shaderInfo.passes) {
-            // Pass names are constructed as 'PASS_index' (e.g., 'PASS_1')
-            this.runtime.dispatchPass(`PASS_${pass.index}`, commandEncoder);
+    }
+    async process(inputSource) {
+        if (!this.initialized) {
+            throw new Error('Instance not initialized');
         }
-
-        // Submit commands to the GPU queue
-        this.runtime.device.queue.submit([commandEncoder.finish()]);
-
-        // 4. Return the final output view
+        if (!inputSource) {
+            throw new Error('Must provide input source');
+        }
+        let sourceWidth = 0;
+        let sourceHeight = 0;
+        if (inputSource instanceof HTMLVideoElement) {
+            sourceWidth = inputSource.videoWidth;
+            sourceHeight = inputSource.videoHeight;
+        }
+        else if (inputSource instanceof VideoFrame) {
+            sourceWidth = inputSource.displayWidth;
+            sourceHeight = inputSource.displayHeight;
+        }
+        else {
+            sourceWidth = inputSource.width;
+            sourceHeight = inputSource.height;
+        }
+        if (sourceWidth !== this.width || sourceHeight !== this.height) {
+            throw new Error(`Input dimensions (${sourceWidth}x${sourceHeight}) ` +
+                `do not match initialized dimensions (${this.width}x${this.height})`);
+        }
+        try {
+            this.runtime.resourceManager.updateTextureFromImage('INPUT', inputSource);
+            const commandEncoder = this.runtime.device.createCommandEncoder({
+                label: 'WGFX Frame Processing'
+            });
+            if (this.runtime.shaderInfo) {
+                for (const pass of this.runtime.shaderInfo.passes) {
+                    this.runtime.dispatchPass(`PASS_${pass.index}`, commandEncoder);
+                }
+            }
+            this.runtime.device.queue.submit([commandEncoder.finish()]);
+            const output = this.runtime.resourceManager.getTexture('OUTPUT');
+            if (!output)
+                throw new Error("Output texture missing");
+            return output;
+        }
+        catch (error) {
+            console.error('Frame processing error:', error);
+            throw error;
+        }
+    }
+    getOutputView() {
         return this.runtime.getOutput();
     }
-
-    /**
-     * - EN: Cleans up all managed GPU resources.
-     * - TW: 清理所有管理的 GPU 資源。
-     */
     dispose() {
-        this.runtime.resourceManager.dispose();
+        if (this.runtime) {
+            this.runtime.resourceManager.dispose();
+            this.runtime.pipelineManager.dispose();
+        }
+        this.initialized = false;
+        console.log('WGFX resources disposed');
     }
 }
 
-export {WGFX};
+export { PipelineManager, ResourceManager, WGFX, WGFXRuntime, WGSLCodeGenerator };
 //# sourceMappingURL=wgfx.browser.esm.js.map
