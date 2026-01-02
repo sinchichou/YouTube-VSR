@@ -1170,7 +1170,7 @@ class PipelineManager {
         if (!originalPassInfo.blockSize && originalPassInfo.numThreads[1] === 1 && outTex.height > 1) ;
         const dx = Math.ceil(outTex.width / blockW);
         const dy = Math.ceil(outTex.height / blockH);
-        console.log(`Dispatch Pass ${passInfo.index}: outTex=${outTex.width}x${outTex.height}, block=${blockW}x${blockH}, dispatch=${dx}x${dy}`);
+        // console.log(`Dispatch Pass ${passInfo.index}: outTex=${outTex.width}x${outTex.height}, block=${blockW}x${blockH}, dispatch=${dx}x${dy}`);
         passEncoder.dispatchWorkgroups(dx, dy, 1);
         passEncoder.end();
     }
@@ -1227,7 +1227,7 @@ class WGSLCodeGenerator {
 }
 @group(0) @binding(4) var<uniform> scene: SceneInfo;
 
-`;
+// `;
         shaderInfo.passes.forEach(pass => {
             let wgsl = `// Pass ${pass.index}\n\n`;
             wgsl += commonCode;
@@ -1322,6 +1322,9 @@ class WGSLCodeGenerator {
                 passIndex: pass.index,
                 resources: passResources
             });
+            console.log(`--- Generated WGSL for Pass ${pass.index} ---`);
+            console.log(wgsl);
+            console.log(`-------------------------------------------`);
         });
         return generatedModules;
     }
