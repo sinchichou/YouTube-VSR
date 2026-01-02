@@ -1,594 +1,550 @@
-// YouTube VSR - Optimized Version with Race Condition Prevention
+// YouTube VSR - Refactored Architecture with WGFX Integration
 (async function () {
-    // 防止腳本重複注入
+    // === 防止重複注入 ===
     if (window.vsrInjected) {
-        console.log("YouTube VSR: 腳本已注入，跳過");
+        console.log("[VSR] 腳本已存在，跳過初始化");
         return;
     }
     window.vsrInjected = true;
 
-    // --- 模組載入 ---
+    // === 模組載入 ===
     let WGFXClass;
     try {
-        const runtimeURL = chrome.runtime.getURL('wgfx.browser.esm.js');
-        const runtimeModule = await import(runtimeURL);
-        WGFXClass = runtimeModule.default || runtimeModule.WGFX;
+        const moduleURL = chrome.runtime.getURL('wgfx.browser.esm.js');
+        const module = await import(moduleURL);
+        WGFXClass = module.default || module.WGFX;
+
         if (!WGFXClass) {
-            throw new Error("找不到 WGFX 類別");
+            throw new Error("WGFX 類別不存在");
         }
-        console.log("YouTube VSR: WGFX 模組已載入");
-    } catch (e) {
-        console.error("YouTube VSR 嚴重錯誤: 模組載入失敗", e);
+        console.log("[VSR] WGFX 模組已載入");
+    } catch (error) {
+        console.error("[VSR] 模組載入失敗", error);
         return;
     }
 
-    // --- 狀態常數 ---
-    const STATE = {
-        IDLE: 'IDLE',
-        SEARCHING: 'SEARCHING',
-        INITIALIZING: 'INITIALIZING',
-        RUNNING: 'RUNNING',
-        STOPPING: 'STOPPING',
-        ERROR: 'ERROR'
-    };
-
-    class VSRController {
+    // ===================================================================
+    // WebGPU 設備管理器（單例模式）
+    // ===================================================================
+    class GPUDeviceManager {
         constructor() {
-            this.state = STATE.IDLE;
-            this.sequenceId = 0;
-            this.isInitializing = false; // 初始化鎖
-
-            // 核心 DOM 元素
-            this.videoElement = null;
-            this.canvas = null;
-            this.playerContainer = null;
-
-            // WebGPU 資源（全域共享）
             this.device = null;
-            this.context = null;
-            this.deviceInitPromise = null; // Promise 快取
-            this.wgfx = null;
-
-            // 循環與觀察器
-            this.searchTimer = null;
-            this.resizeTimeout = null;
-            this.resizeObserver = null;
-
-            // 狀態資料
-            this.currentPipeline = [];
-            this.currentEffectCode = null;
-            this.effectParameters = {};
-            this.shaderCache = new Map();
-
-            // 事件包裝器
-            this._handleVideoEndedWrapper = null;
+            this.initPromise = null;
+            this.isDestroyed = false;
         }
 
-        // --- 公共介面 ---
-
-        async start() {
-            // 防止重複啟動
-            if (this.isInitializing) {
-                console.log("YouTube VSR: 初始化進行中，忽略啟動請求");
-                return;
+        async initialize() {
+            // 使用快取避免重複初始化
+            if (this.initPromise) {
+                return this.initPromise;
             }
 
-            // 產生新的序列 ID
-            const mySeq = ++this.sequenceId;
+            this.initPromise = this._doInitialize();
+            return this.initPromise;
+        }
 
-            // 如果正在運行，先停止
-            if (this.state === STATE.RUNNING || this.state === STATE.INITIALIZING) {
-                await this.stop(false);
-            }
-
-            console.log(`YouTube VSR [${mySeq}]: 啟動生命週期...`);
-            this.state = STATE.SEARCHING;
-            this.isInitializing = true;
-
+        async _doInitialize() {
             try {
-                await this._findVideoTarget(mySeq);
+                if (!navigator.gpu) {
+                    throw new Error("瀏覽器不支援 WebGPU");
+                }
+
+                const adapter = await navigator.gpu.requestAdapter();
+                if (!adapter) {
+                    throw new Error("無法取得 GPU 適配器");
+                }
+
+                this.device = await adapter.requestDevice({
+                    requiredLimits: {
+                        maxStorageTexturesPerShaderStage: Math.min(
+                            8,
+                            adapter.limits.maxStorageTexturesPerShaderStage
+                        )
+                    }
+                });
+
+                // 監聽設備遺失事件
+                this.device.lost.then((info) => {
+                    console.error("[VSR] GPU 設備遺失", info.reason, info.message);
+                    this.reset();
+                });
+
+                console.log("[VSR] GPU 設備初始化成功");
+                return this.device;
+
             } catch (error) {
-                console.error(`YouTube VSR [${mySeq}]: 啟動失敗`, error);
-                this.isInitializing = false;
+                console.error("[VSR] GPU 設備初始化失敗", error);
+                this.initPromise = null;
+                throw error;
             }
         }
 
-        async stop(completely = true) {
-            console.log("YouTube VSR: 停止中...");
+        getDevice() {
+            return this.device;
+        }
 
-            // 設定停止狀態以中斷循環
-            const previousState = this.state;
-            this.state = STATE.STOPPING;
-            this.isInitializing = false;
+        reset() {
+            this.device = null;
+            this.initPromise = null;
+        }
 
-            // 停止渲染循環
-            this._stopRenderLoop();
-
-            // 釋放 WGFX
-            this._disposeWGFX();
-
-            // 清理觀察器
-            this._cleanupObservers();
-
-            // 恢復原始畫面
-            await this._restoreOriginalDisplay();
-
-            // 清理 DOM
-            this._cleanupDOM();
-
-            // 完全停止時銷毀設備
-            if (completely && this.device) {
+        destroy() {
+            if (this.device && !this.isDestroyed) {
                 try {
                     this.device.destroy();
-                    console.log("YouTube VSR: GPU 設備已銷毀");
-                } catch (e) {
-                    console.warn("YouTube VSR: 設備銷毀失敗", e);
+                    console.log("[VSR] GPU 設備已銷毀");
+                } catch (error) {
+                    console.warn("[VSR] 設備銷毀失敗", error);
                 }
-                this.device = null;
-                this.context = null;
-                this.deviceInitPromise = null;
+                this.isDestroyed = true;
             }
+            this.reset();
+        }
+    }
 
-            this.videoElement = null;
+    // ===================================================================
+    // Canvas 渲染器（封裝 WebGPU Context）
+    // ===================================================================
+    class CanvasRenderer {
+        constructor(device) {
+            this.device = device;
+            this.canvas = null;
+            this.context = null;
+            this.configured = false;
+        }
 
-            if (completely) {
-                this.state = STATE.IDLE;
-                this.currentEffectCode = null;
-                this.effectParameters = {};
-                console.log("YouTube VSR: 已完全停止");
-            } else {
-                // 部分停止（保留設定）
-                this.state = previousState === STATE.RUNNING ? STATE.IDLE : previousState;
+        createCanvas() {
+            this.canvas = document.createElement('canvas');
+            this.canvas.width = 1920;
+            this.canvas.height = 1080;
+
+            Object.assign(this.canvas.style, {
+                position: 'absolute',
+                top: '0',
+                left: '0',
+                width: '100%',
+                height: '100%',
+                zIndex: '10',
+                pointerEvents: 'none',
+                objectFit: 'contain',
+                display: 'none'
+            });
+
+            this.context = this.canvas.getContext('webgpu');
+            console.log("[VSR] Canvas 已建立");
+            return this.canvas;
+        }
+
+        configure(width, height) {
+            if (!this.context || !this.device) return false;
+
+            try {
+                // 更新 canvas 解析度
+                this.canvas.width = width;
+                this.canvas.height = height;
+
+                // 配置 WebGPU context
+                this.context.configure({
+                    device: this.device,
+                    format: 'rgba16float',
+                    usage: GPUTextureUsage.RENDER_ATTACHMENT | GPUTextureUsage.COPY_DST,
+                    alphaMode: 'opaque'
+                });
+
+                this.configured = true;
+                console.log(`[VSR] Canvas 已配置: ${width}x${height}`);
+                return true;
+
+            } catch (error) {
+                console.error("[VSR] Canvas 配置失敗", error);
+                this.configured = false;
+                return false;
             }
         }
 
-        async setPipeline(pipeline) {
-            const mySeq = ++this.sequenceId;
-            this.currentPipeline = pipeline || [];
-
-            if (this.state === STATE.IDLE || this.state === STATE.SEARCHING) {
-                return;
+        renderTexture(sourceTexture) {
+            if (!this.configured || !this.device || !this.context) {
+                return false;
             }
 
-            console.log(`YouTube VSR [${mySeq}]: 更新管線...`);
+            try {
+                const canvasTexture = this.context.getCurrentTexture();
 
-            // 暫停渲染並重建
-            this._disposeWGFX();
-            await this._buildAndCompile(mySeq);
+                // 尺寸驗證
+                if (sourceTexture.width !== canvasTexture.width ||
+                    sourceTexture.height !== canvasTexture.height) {
+                    console.warn("[VSR] 紋理尺寸不匹配");
+                    return false;
+                }
+
+                // 複製紋理到 canvas
+                const encoder = this.device.createCommandEncoder();
+                encoder.copyTextureToTexture(
+                    { texture: sourceTexture },
+                    { texture: canvasTexture },
+                    [sourceTexture.width, sourceTexture.height]
+                );
+                this.device.queue.submit([encoder.finish()]);
+
+                return true;
+
+            } catch (error) {
+                console.error("[VSR] 渲染錯誤", error);
+                return false;
+            }
+        }
+
+        show() {
+            if (this.canvas) {
+                this.canvas.style.display = 'block';
+            }
+        }
+
+        hide() {
+            if (this.canvas) {
+                this.canvas.style.display = 'none';
+            }
+        }
+
+        dispose() {
+            if (this.canvas && this.canvas.parentElement) {
+                this.canvas.parentElement.removeChild(this.canvas);
+            }
+            this.canvas = null;
+            this.context = null;
+            this.configured = false;
+        }
+    }
+
+    // ===================================================================
+    // WGFX 處理引擎（封裝 WGFX 實例）
+    // ===================================================================
+    class WGFXProcessor {
+        constructor(device) {
+            this.device = device;
+            this.wgfx = null;
+            this.shaderCache = new Map();
+            this.effectCode = null;
+            this.parameters = {};
+        }
+
+        async compile(effectPath, width, height) {
+            // 載入著色器代碼（快取機制）
+            if (!this.shaderCache.has(effectPath)) {
+                const response = await fetch(chrome.runtime.getURL(effectPath));
+                if (!response.ok) {
+                    throw new Error(`著色器載入失敗: ${effectPath}`);
+                }
+                const code = await response.text();
+                this.shaderCache.set(effectPath, code);
+            }
+
+            this.effectCode = this.shaderCache.get(effectPath);
+
+            // 建立 WGFX 實例
+            try {
+                const instance = await WGFXClass.create({
+                    device: this.device,
+                    effectCode: this.effectCode,
+                    width: width,
+                    height: height
+                });
+
+                // 初始化並提取參數資訊
+                const metadata = instance.initialize();
+                console.log(`[VSR] WGFX 編譯成功: ${width}x${height}, ${metadata.passes} passes`);
+
+                // 設定預設參數
+                if (metadata.uniforms) {
+                    metadata.uniforms.forEach(uniform => {
+                        if (this.parameters[uniform.name] === undefined) {
+                            this.parameters[uniform.name] = uniform.default;
+                        }
+                    });
+                    instance.updateUniforms(this.parameters);
+                }
+
+                this.wgfx = instance;
+                return metadata;
+
+            } catch (error) {
+                console.error("[VSR] WGFX 編譯失敗", error);
+                throw error;
+            }
         }
 
         updateParameter(name, value) {
-            this.effectParameters[name] = value;
+            this.parameters[name] = value;
             if (this.wgfx) {
                 try {
-                    this.wgfx.updateUniforms({ [name]: value });
-                } catch (e) {
-                    console.warn("YouTube VSR: 更新參數失敗", e);
+                    this.wgfx.updateUniforms({[name]: value});
+                } catch (error) {
+                    console.warn(`[VSR] 參數更新失敗: ${name}`, error);
                 }
             }
         }
 
-        // --- 私有邏輯 ---
+        async processFrame(inputSource) {
+            if (!this.wgfx) {
+                throw new Error("WGFX 未初始化");
+            }
 
-        async _findVideoTarget(seqId) {
-            const playerSelector = '.html5-video-player';
-            const videoSelector = 'video';
-            let retries = 20;
+            try {
+                const outputTexture = await this.wgfx.process(inputSource);
+                return outputTexture;
+            } catch (error) {
+                console.error("[VSR] 幀處理失敗", error);
+                throw error;
+            }
+        }
 
+        dispose() {
+            if (this.wgfx) {
+                try {
+                    this.wgfx.dispose();
+                    console.log("[VSR] WGFX 資源已釋放");
+                } catch (error) {
+                    console.warn("[VSR] WGFX 釋放失敗", error);
+                }
+                this.wgfx = null;
+            }
+            this.effectCode = null;
+        }
+    }
+
+    // ===================================================================
+    // 主控制器（生命週期管理）
+    // ===================================================================
+    class VSRController {
+        constructor() {
+            this.state = 'IDLE'; // IDLE | SEARCHING | READY | RUNNING | STOPPED
+            this.abortController = null;
+
+            // 核心元件
+            this.deviceManager = new GPUDeviceManager();
+            this.renderer = null;
+            this.processor = null;
+
+            // DOM 元素
+            this.videoElement = null;
+            this.playerContainer = null;
+
+            // 配置
+            this.pipeline = [];
+            this.currentEffectPath = null;
+
+            // 觀察器
+            this.resizeObserver = null;
+            this.searchInterval = null;
+
+            // 渲染狀態
+            this.frameRequestId = null;
+        }
+
+        // === 公開介面 ===
+
+        async start() {
+            if (this.state === 'RUNNING') {
+                console.log("[VSR] 已在運行中");
+                return;
+            }
+
+            console.log("[VSR] 啟動系統...");
+            this.state = 'SEARCHING';
+            this.abortController = new AbortController();
+
+            try {
+                // 1. 尋找視頻元素
+                await this._findVideoElement();
+                if (this._isAborted()) return;
+
+                // 2. 初始化 GPU
+                await this.deviceManager.initialize();
+                if (this._isAborted()) return;
+
+                // 3. 建立渲染器
+                this.renderer = new CanvasRenderer(this.deviceManager.getDevice());
+                const canvas = this.renderer.createCanvas();
+                this.playerContainer.appendChild(canvas);
+
+                // 4. 載入管線設定
+                await this._loadPipelineConfig();
+                if (this._isAborted()) return;
+
+                // 5. 編譯特效
+                await this._compileEffect();
+                if (this._isAborted()) return;
+
+                // 6. 設置監聽
+                this._setupObservers();
+
+                // 7. 啟動渲染
+                this.state = 'RUNNING';
+                this._startRenderLoop();
+                this._hideOriginalVideo();
+
+                console.log("[VSR] 系統已啟動");
+
+            } catch (error) {
+                console.error("[VSR] 啟動失敗", error);
+                await this.stop();
+            }
+        }
+
+        async stop() {
+            console.log("[VSR] 停止系統...");
+
+            // 中止進行中的操作
+            if (this.abortController) {
+                this.abortController.abort();
+            }
+
+            // 停止渲染
+            this._stopRenderLoop();
+
+            // 釋放資源（順序很重要）
+            this._cleanupObservers();
+
+            if (this.processor) {
+                this.processor.dispose();
+                this.processor = null;
+            }
+
+            if (this.renderer) {
+                this.renderer.dispose();
+                this.renderer = null;
+            }
+
+            // 恢復原始畫面
+            this._showOriginalVideo();
+
+            // 清理 DOM 引用
+            this.videoElement = null;
+            this.playerContainer = null;
+
+            this.state = 'STOPPED';
+            console.log("[VSR] 系統已停止");
+        }
+
+        async updatePipeline(newPipeline) {
+            this.pipeline = newPipeline || [];
+
+            if (this.state !== 'RUNNING') {
+                return;
+            }
+
+            console.log("[VSR] 更新管線...");
+
+            // 釋放舊的處理器
+            if (this.processor) {
+                this.processor.dispose();
+                this.processor = null;
+            }
+
+            // 重新編譯
+            try {
+                await this._compileEffect();
+            } catch (error) {
+                console.error("[VSR] 管線更新失敗", error);
+            }
+        }
+
+        updateParameter(name, value) {
+            if (this.processor) {
+                this.processor.updateParameter(name, value);
+            }
+        }
+
+        // === 私有方法 ===
+
+        async _findVideoElement() {
             return new Promise((resolve, reject) => {
-                if (this.searchTimer) clearInterval(this.searchTimer);
+                let attempts = 0;
+                const maxAttempts = 20;
 
-                this.searchTimer = setInterval(async () => {
-                    // 競態檢查
-                    if (this.sequenceId !== seqId || this.state !== STATE.SEARCHING) {
-                        clearInterval(this.searchTimer);
-                        this.searchTimer = null;
-                        reject(new Error("序列已過期"));
+                this.searchInterval = setInterval(() => {
+                    if (this._isAborted()) {
+                        clearInterval(this.searchInterval);
+                        reject(new Error("搜尋已中止"));
                         return;
                     }
 
-                    const playerContainer = document.querySelector(playerSelector);
-                    const video = document.querySelector(videoSelector);
+                    const player = document.querySelector('.html5-video-player');
+                    const video = document.querySelector('video');
 
-                    if (playerContainer && video && video.readyState >= 1) {
-                        clearInterval(this.searchTimer);
-                        this.searchTimer = null;
-                        console.log(`YouTube VSR [${seqId}]: 找到目標元素`);
+                    if (player && video && video.readyState >= 1) {
+                        clearInterval(this.searchInterval);
+                        this.playerContainer = player;
+                        this.videoElement = video;
+                        console.log("[VSR] 視頻元素已找到");
+                        resolve();
+                        return;
+                    }
 
-                        try {
-                            await this._initialize(seqId, playerContainer, video);
-                            resolve();
-                        } catch (error) {
-                            reject(error);
-                        }
-                    } else {
-                        retries--;
-                        if (retries <= 0) {
-                            clearInterval(this.searchTimer);
-                            this.searchTimer = null;
-                            console.warn(`YouTube VSR [${seqId}]: 逾時`);
-                            reject(new Error("找不到視頻元素"));
-                        }
+                    attempts++;
+                    if (attempts >= maxAttempts) {
+                        clearInterval(this.searchInterval);
+                        reject(new Error("找不到視頻元素"));
                     }
                 }, 500);
             });
         }
 
-        async _initialize(seqId, playerContainer, video) {
-            this.state = STATE.INITIALIZING;
-            this.videoElement = video;
-            this.playerContainer = playerContainer;
+        async _loadPipelineConfig() {
+            if (this.pipeline.length === 0) {
+                const settings = await chrome.storage.local.get(['pipeline']);
+                this.pipeline = settings.pipeline || [];
+            }
 
-            try {
-                // 1. 設置 WebGPU（單次初始化）
-                if (!this.device) {
-                    const success = await this._setupWebGPU();
-                    if (!success) {
-                        throw new Error("WebGPU 初始化失敗");
-                    }
-                }
+            if (this.pipeline.length > 0) {
+                this.currentEffectPath = this.pipeline[0].path;
+            }
+        }
 
-                // 競態檢查
-                if (this.sequenceId !== seqId) {
-                    console.log(`YouTube VSR [${seqId}]: 序列已過期，中止初始化`);
-                    return;
-                }
+        async _compileEffect() {
+            if (!this.currentEffectPath) {
+                console.warn("[VSR] 無可用特效");
+                return;
+            }
 
-                // 2. 配置 Canvas
-                this._configureCanvas();
+            const width = this.videoElement.videoWidth;
+            const height = this.videoElement.videoHeight;
 
-                // 3. 掛載 DOM
-                if (this.canvas && !this.canvas.parentElement) {
-                    this.playerContainer.appendChild(this.canvas);
-                }
+            if (width === 0 || height === 0) {
+                throw new Error("視頻尺寸無效");
+            }
 
-                // 4. 載入管線設定
-                if (this.currentPipeline.length === 0) {
-                    const settings = await chrome.storage.local.get(['pipeline']);
-                    if (this.sequenceId !== seqId) return;
-                    this.currentPipeline = settings.pipeline || [];
-                }
+            // 建立處理器
+            this.processor = new WGFXProcessor(this.deviceManager.getDevice());
 
-                // 5. 建構與編譯
-                await this._buildAndCompile(seqId);
-                if (this.sequenceId !== seqId) return;
+            // 編譯特效
+            await this.processor.compile(this.currentEffectPath, width, height);
 
-                // 6. 設置觀察器
-                this._setupObservers();
+            // 配置渲染器
+            this.renderer.configure(width, height);
+
+            // 應用參數
+            const effectConfig = this.pipeline[0];
+            if (effectConfig.params) {
+                Object.entries(effectConfig.params).forEach(([name, value]) => {
+                    this.processor.updateParameter(name, value);
+                });
+            }
+        }
+
+        _setupObservers() {
+            // 尺寸監聽
+            this.resizeObserver = new ResizeObserver(() => {
                 this._handleResize();
-
-                // 7. 隱藏原始視頻
-                if (this.wgfx) {
-                    this.videoElement.style.opacity = '0';
-                }
-
-                this.state = STATE.RUNNING;
-                this.isInitializing = false;
-                console.log(`YouTube VSR [${seqId}]: 系統運行中`);
-
-                this._renderLoop();
-
-            } catch (error) {
-                console.error(`YouTube VSR [${seqId}]: 初始化錯誤`, error);
-                this.isInitializing = false;
-                await this.stop();
-            }
-        }
-
-        async _setupWebGPU() {
-            // 使用 Promise 快取防止重複初始化
-            if (this.deviceInitPromise) {
-                console.log("YouTube VSR: 使用快取的設備初始化");
-                return this.deviceInitPromise;
-            }
-
-            this.deviceInitPromise = (async () => {
-                try {
-                    if (!navigator.gpu) {
-                        throw new Error("不支援 WebGPU");
-                    }
-
-                    const adapter = await navigator.gpu.requestAdapter();
-                    if (!adapter) {
-                        throw new Error("找不到 GPU 適配器");
-                    }
-
-                    this.device = await adapter.requestDevice({
-                        requiredLimits: {
-                            maxStorageTexturesPerShaderStage: Math.min(
-                                8,
-                                adapter.limits.maxStorageTexturesPerShaderStage
-                            )
-                        }
-                    });
-
-                    // 監聽設備丟失
-                    this.device.lost.then((info) => {
-                        console.error("YouTube VSR: GPU 設備丟失", info);
-                        this.deviceInitPromise = null; // 允許重新初始化
-                        this.stop();
-                    });
-
-                    // 建立 Canvas
-                    this.canvas = document.createElement('canvas');
-                    this.canvas.width = 1;
-                    this.canvas.height = 1;
-                    Object.assign(this.canvas.style, {
-                        position: 'absolute',
-                        zIndex: '10',
-                        pointerEvents: 'none',
-                        width: '100%',
-                        height: '100%',
-                        top: '0',
-                        left: '0',
-                        objectFit: 'contain'
-                    });
-
-                    this.context = this.canvas.getContext('webgpu');
-                    console.log("YouTube VSR: WebGPU 設備已初始化");
-                    return true;
-
-                } catch (e) {
-                    console.error("YouTube VSR: WebGPU 設置失敗", e);
-                    this.deviceInitPromise = null;
-                    return false;
-                }
-            })();
-
-            return this.deviceInitPromise;
-        }
-
-        _configureCanvas() {
-            if (!this.device || !this.context) return;
-
-            try {
-                this.context.configure({
-                    device: this.device,
-                    format: 'rgba16float',
-                    usage: GPUTextureUsage.RENDER_ATTACHMENT | GPUTextureUsage.COPY_DST,
-                    alphaMode: 'opaque',
-                });
-            } catch (e) {
-                console.error("YouTube VSR: Canvas 配置失敗", e);
-            }
-        }
-
-        async _buildAndCompile(seqId) {
-            if (this.currentPipeline.length === 0) return;
-
-            const effectStep = this.currentPipeline[0];
-            try {
-                // 初始化參數
-                Object.assign(this.effectParameters, effectStep.params || {});
-
-                // 載入著色器代碼
-                if (!this.shaderCache.has(effectStep.path)) {
-                    const res = await fetch(chrome.runtime.getURL(effectStep.path));
-                    if (!res.ok) throw new Error("著色器 404");
-                    const code = await res.text();
-                    this.shaderCache.set(effectStep.path, code);
-                }
-
-                // 競態檢查
-                if (this.sequenceId !== seqId) {
-                    console.log(`YouTube VSR [${seqId}]: 序列已過期，中止編譯`);
-                    return;
-                }
-
-                this.currentEffectCode = this.shaderCache.get(effectStep.path);
-                await this._compileEffect(seqId);
-
-            } catch (e) {
-                console.error("YouTube VSR: 管線建構失敗", e);
-            }
-        }
-
-        async _compileEffect(seqId) {
-            if (!this.currentEffectCode || !this.videoElement || !this.device) return;
-            if (this.videoElement.videoWidth === 0 || this.videoElement.videoHeight === 0) return;
-
-            try {
-                const width = this.videoElement.videoWidth;
-                const height = this.videoElement.videoHeight;
-
-                // 呼叫 WGFX 介面
-                const wgfxInstance = await WGFXClass.create({
-                    device: this.device,
-                    effectCode: this.currentEffectCode,
-                    width,
-                    height
-                });
-
-                // 競態檢查
-                if (this.sequenceId !== seqId) {
-                    console.log(`YouTube VSR [${seqId}]: 序列已過期，丟棄 WGFX 實例`);
-                    wgfxInstance.dispose();
-                    return;
-                }
-
-                this.wgfx = wgfxInstance;
-
-                // 初始化 WGFX 與 Uniforms
-                const metadata = this.wgfx.initialize();
-
-                // 套用預設值
-                if (metadata?.uniforms) {
-                    metadata.uniforms.forEach(u => {
-                        if (this.effectParameters[u.name] === undefined && u.default !== undefined) {
-                            this.effectParameters[u.name] = u.default;
-                        }
-                    });
-                }
-
-                // 更新 uniforms
-                this.wgfx.updateUniforms(this.effectParameters);
-
-                console.log(`YouTube VSR [${seqId}]: WGFX 編譯完成 (${width}x${height})`);
-
-            } catch (e) {
-                console.error("YouTube VSR: 編譯錯誤", e);
-            }
-        }
-
-        // --- 渲染循環 ---
-
-        _renderLoop() {
-            // 嚴格狀態檢查
-            if (this.state !== STATE.RUNNING && this.state !== STATE.INITIALIZING) {
-                return;
-            }
-
-            // 即使 wgfx 不存在也維持循環（等待編譯）
-            if (!this.wgfx || !this.videoElement) {
-                // 降級顯示
-                if (this.canvas) this.canvas.style.display = 'none';
-                if (this.videoElement) this.videoElement.style.opacity = '1';
-
-                if (this.videoElement?.requestVideoFrameCallback) {
-                    this.videoElement.requestVideoFrameCallback(() => this._renderLoop());
-                } else if (this.state === STATE.RUNNING) {
-                    requestAnimationFrame(() => this._renderLoop());
-                }
-                return;
-            }
-
-            // 正常運作
-            if (this.canvas.style.display === 'none') {
-                this.canvas.style.display = 'block';
-                this.videoElement.style.opacity = '0';
-            }
-
-            this._processFrame().then(() => {
-                if (this.state === STATE.RUNNING && this.videoElement) {
-                    this.videoElement.requestVideoFrameCallback(() => this._renderLoop());
-                }
-            }).catch(() => {
-                // 錯誤處理
-                if (this.state === STATE.RUNNING) {
-                    requestAnimationFrame(() => this._renderLoop());
-                }
             });
-        }
+            this.resizeObserver.observe(this.videoElement);
 
-        async _processFrame() {
-            if (!this.wgfx || !this.device) return;
-            if (this.videoElement.videoWidth === 0) return;
-
-            let frame = null;
-            try {
-                if (typeof VideoFrame !== 'undefined') {
-                    frame = new VideoFrame(this.videoElement);
-                } else {
-                    frame = await createImageBitmap(this.videoElement);
-                }
-
-                const outputTexture = await this.wgfx.process(frame);
-                this._renderToCanvas(outputTexture);
-
-            } catch (e) {
-                if (this.state === STATE.RUNNING) {
-                    // console.warn("幀錯誤", e);
-                }
-            } finally {
-                if (frame?.close) frame.close();
-            }
-        }
-
-        _renderToCanvas(sourceTexture) {
-            if (!this.device || !this.context) return;
-
-            try {
-                const canvasTexture = this.context.getCurrentTexture();
-
-                // 驗證尺寸匹配
-                if (sourceTexture.width !== canvasTexture.width ||
-                    sourceTexture.height !== canvasTexture.height) {
-                    return;
-                }
-
-                const commandEncoder = this.device.createCommandEncoder();
-                commandEncoder.copyTextureToTexture(
-                    { texture: sourceTexture },
-                    { texture: canvasTexture },
-                    [sourceTexture.width, sourceTexture.height]
-                );
-                this.device.queue.submit([commandEncoder.finish()]);
-            } catch (e) {
-                // WebGPU 驗證錯誤（忽略）
-            }
-        }
-
-        // --- 事件處理與清理 ---
-
-        _handleResize() {
-            if (!this.videoElement || !this.canvas) return;
-
-            // DOM 同步
-            const rect = this.videoElement.getBoundingClientRect();
-            Object.assign(this.canvas.style, {
-                width: `${rect.width}px`,
-                height: `${rect.height}px`,
-                top: `${rect.top}px`,
-                left: `${rect.left}px`
-            });
-
-            // 解析度同步
-            const vw = this.videoElement.videoWidth;
-            const vh = this.videoElement.videoHeight;
-
-            if (vw > 0 && vh > 0 &&
-                (this.canvas.width !== vw || this.canvas.height !== vh)) {
-                console.log(`YouTube VSR: 偵測到尺寸變更 ${vw}x${vh}`);
-                this.canvas.width = vw;
-                this.canvas.height = vh;
-                this._configureCanvas();
-
-                // 防抖重新編譯
-                if (this.resizeTimeout) clearTimeout(this.resizeTimeout);
-                this.resizeTimeout = setTimeout(() => {
-                    this._triggerRecompile();
-                }, 250);
-            }
-        }
-
-        async _triggerRecompile() {
-            if (this.state !== STATE.RUNNING) return;
-
-            console.log("YouTube VSR: 觸發重新編譯");
-            this._disposeWGFX();
-            await this._compileEffect(this.sequenceId);
-        }
-
-        async _restoreOriginalDisplay() {
-            // 恢復原始視頻顯示
-            if (this.videoElement) {
-                this.videoElement.style.opacity = '1';
-                console.log("YouTube VSR: 已恢復原始畫面");
-            }
-
-            // 隱藏 canvas
-            if (this.canvas) {
-                this.canvas.style.display = 'none';
-            }
-
-            // 等待下一幀確保 DOM 更新
-            await new Promise(resolve => requestAnimationFrame(resolve));
-        }
-
-        _stopRenderLoop() {
-            // 由狀態檢查處理
-        }
-
-        _disposeWGFX() {
-            if (this.wgfx) {
-                try {
-                    this.wgfx.dispose();
-                    console.log("YouTube VSR: WGFX 已釋放");
-                } catch (e) {
-                    console.warn("YouTube VSR: WGFX 釋放失敗", e);
-                }
-                this.wgfx = null;
-            }
+            // 視頻結束事件
+            this.videoElement.addEventListener('ended', () => {
+                console.log("[VSR] 視頻已結束");
+                chrome.runtime.sendMessage({command: 'videoEnded'}).catch(() => {
+                });
+            }, {once: true});
         }
 
         _cleanupObservers() {
@@ -596,79 +552,188 @@
                 this.resizeObserver.disconnect();
                 this.resizeObserver = null;
             }
-            if (this.searchTimer) {
-                clearInterval(this.searchTimer);
-                this.searchTimer = null;
-            }
-            if (this.resizeTimeout) {
-                clearTimeout(this.resizeTimeout);
-                this.resizeTimeout = null;
-            }
-            if (this.videoElement && this._handleVideoEndedWrapper) {
-                this.videoElement.removeEventListener('ended', this._handleVideoEndedWrapper);
-                this._handleVideoEndedWrapper = null;
+
+            if (this.searchInterval) {
+                clearInterval(this.searchInterval);
+                this.searchInterval = null;
             }
         }
 
-        _cleanupDOM() {
-            if (this.canvas && this.canvas.parentElement) {
-                this.canvas.parentElement.removeChild(this.canvas);
+        _handleResize() {
+            if (!this.videoElement || !this.renderer || !this.renderer.canvas) {
+                return;
+            }
+
+            // 同步 DOM 尺寸
+            const rect = this.videoElement.getBoundingClientRect();
+            Object.assign(this.renderer.canvas.style, {
+                width: `${rect.width}px`,
+                height: `${rect.height}px`
+            });
+
+            // 檢查解析度變化
+            const vw = this.videoElement.videoWidth;
+            const vh = this.videoElement.videoHeight;
+
+            if (vw > 0 && vh > 0 &&
+                (this.renderer.canvas.width !== vw || this.renderer.canvas.height !== vh)) {
+                console.log(`[VSR] 解析度變更: ${vw}x${vh}`);
+
+                // 防抖重新編譯
+                clearTimeout(this._resizeDebounce);
+                this._resizeDebounce = setTimeout(async () => {
+                    if (this.state === 'RUNNING') {
+                        await this._compileEffect();
+                    }
+                }, 300);
             }
         }
 
-        _setupObservers() {
-            if (this.resizeObserver) this.resizeObserver.disconnect();
+        // === 渲染循環 ===
 
-            this.resizeObserver = new ResizeObserver(() => this._handleResize());
-            this.resizeObserver.observe(this.videoElement);
+        _startRenderLoop() {
+            if (!this.videoElement) return;
 
-            this._handleVideoEndedWrapper = () => {
-                console.log("YouTube VSR: 視頻已結束");
-                chrome.runtime.sendMessage({ command: 'videoEnded' }).catch(() => { });
+            const renderFrame = async () => {
+                if (this.state !== 'RUNNING') return;
+
+                try {
+                    await this._processAndRender();
+                } catch (error) {
+                    console.warn("[VSR] 渲染錯誤", error);
+                }
+
+                // 使用 rVFC 提升效能
+                if (this.videoElement.requestVideoFrameCallback) {
+                    this.frameRequestId = this.videoElement.requestVideoFrameCallback(renderFrame);
+                } else {
+                    this.frameRequestId = requestAnimationFrame(renderFrame);
+                }
             };
-            this.videoElement.addEventListener('ended', this._handleVideoEndedWrapper, { once: true });
+
+            renderFrame();
+        }
+
+        _stopRenderLoop() {
+            if (this.frameRequestId && this.videoElement) {
+                if (this.videoElement.cancelVideoFrameCallback) {
+                    this.videoElement.cancelVideoFrameCallback(this.frameRequestId);
+                } else {
+                    cancelAnimationFrame(this.frameRequestId);
+                }
+                this.frameRequestId = null;
+            }
+        }
+
+        async _processAndRender() {
+            if (!this.processor || !this.renderer) {
+                // 降級顯示
+                this.renderer?.hide();
+                this._showOriginalVideo();
+                return;
+            }
+
+            let frame = null;
+            try {
+                // 建立 VideoFrame（高效能）
+                if (typeof VideoFrame !== 'undefined') {
+                    frame = new VideoFrame(this.videoElement);
+                } else {
+                    frame = await createImageBitmap(this.videoElement);
+                }
+
+                // 處理幀
+                const outputTexture = await this.processor.processFrame(frame);
+
+                // 渲染到 canvas
+                const success = this.renderer.renderTexture(outputTexture);
+
+                if (success) {
+                    this.renderer.show();
+                    this._hideOriginalVideo();
+                }
+
+            } finally {
+                // 釋放 frame
+                if (frame?.close) {
+                    frame.close();
+                }
+            }
+        }
+
+        _hideOriginalVideo() {
+            if (this.videoElement) {
+                this.videoElement.style.opacity = '0';
+            }
+        }
+
+        _showOriginalVideo() {
+            if (this.videoElement) {
+                this.videoElement.style.opacity = '1';
+            }
+        }
+
+        _isAborted() {
+            return this.abortController?.signal.aborted;
         }
     }
 
-    // --- 單例實例與全域訊息處理器 ---
+    // ===================================================================
+    // 訊息處理與初始化
+    // ===================================================================
 
     const controller = new VSRController();
 
+    // Chrome 擴充功能訊息處理
     chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
-        switch (request.command) {
-            case 'setEnable':
-                if (request.isEnabled) {
-                    controller.start().then(() => sendResponse({ status: 'started' }));
-                } else {
-                    controller.stop().then(() => sendResponse({ status: 'stopped' }));
+        (async () => {
+            try {
+                switch (request.command) {
+                    case 'setEnable':
+                        if (request.isEnabled) {
+                            await controller.start();
+                            sendResponse({status: 'started'});
+                        } else {
+                            await controller.stop();
+                            sendResponse({status: 'stopped'});
+                        }
+                        break;
+
+                    case 'setPipeline':
+                        await controller.updatePipeline(request.pipeline);
+                        sendResponse({status: 'ok'});
+                        break;
+
+                    case 'updateParameter':
+                        controller.updateParameter(request.paramName, request.value);
+                        sendResponse({status: 'ok'});
+                        break;
+
+                    case 'navigation':
+                        console.log('[VSR] 偵測到導航事件');
+                        await controller.stop();
+                        setTimeout(() => controller.start(), 100);
+                        break;
+
+                    default:
+                        sendResponse({status: 'unknown_command'});
                 }
-                return true; // 保持訊息通道開啟
+            } catch (error) {
+                console.error('[VSR] 訊息處理錯誤', error);
+                sendResponse({status: 'error', message: error.message});
+            }
+        })();
 
-            case 'setPipeline':
-                controller.setPipeline(request.pipeline)
-                    .then(() => sendResponse({ status: 'ok' }))
-                    .catch(error => sendResponse({ status: 'error', error: error.message }));
-                return true;
-
-            case 'updateParameter':
-                controller.updateParameter(request.paramName, request.value);
-                sendResponse({ status: 'ok' });
-                break;
-
-            case 'navigation':
-                console.log('YouTube VSR: 導航事件 -> 重新啟動');
-                controller.stop(false).then(() => {
-                    setTimeout(() => controller.start(), 100);
-                });
-                break;
-        }
+        return true; // 保持訊息通道開啟
     });
 
-    // 初始檢查
+    // 初始狀態檢查
     chrome.storage.local.get('isEnabled', (result) => {
         if (result.isEnabled) {
             controller.start();
         }
     });
+
+    console.log("[VSR] 腳本已就緒");
 
 })();
