@@ -770,90 +770,127 @@ function peg$parse(input, options) {
 }
 
 /**
- * @file Logger.ts
- * @description Unified logging utility for WGFX
- * WGFX 的統一日誌工具
+ * @module Logger
+ * @description Unified logging utility for the WGFX engine.
+ * ---
+ * WGFX 引擎的統一日誌工具，支援層級過濾與自定義輸出格式。
  */
 /**
- * Log level enumeration
- * 日誌層級列舉
+ * Log level enumeration.
+ * ---
+ * 日誌層級列舉，用於控制日誌輸出的詳細程度。
+ *
+ * @category Constants
  */
 var LogLevel;
 (function (LogLevel) {
+    /** Detailed debug information / 詳細的偵錯資訊 */
     LogLevel[LogLevel["DEBUG"] = 0] = "DEBUG";
+    /** General operational messages / 一般運作訊息 */
     LogLevel[LogLevel["INFO"] = 1] = "INFO";
+    /** Warning messages for non-critical issues / 非致命問題的警告訊息 */
     LogLevel[LogLevel["WARN"] = 2] = "WARN";
+    /** Critical error messages / 致命錯誤訊息 */
     LogLevel[LogLevel["ERROR"] = 3] = "ERROR";
+    /** Disable all logging / 停用所有日誌輸出 */
     LogLevel[LogLevel["NONE"] = 4] = "NONE";
 })(LogLevel || (LogLevel = {}));
-
 /**
- * Logger class for unified error output and debug mode control
- * 用於統一錯誤輸出與偵錯模式控制的日誌類別
+ * Logger class for unified error output and debug mode control.
+ * ---
+ * 用於統一錯誤輸出與偵錯模式控制的靜態類別。
+ *
+ * @group Utils
+ * @category Utility
+ *
+ * @example
+ * ```ts
+ * // Enable debug mode to see all logs / 啟用偵錯模式以查看所有日誌
+ * Logger.setDebug(true);
+ * Logger.debug("Checking resources...");
+ *
+ * // Set specific level / 設定特定層級
+ * Logger.setLevel(LogLevel.ERROR);
+ * ```
  */
 class Logger {
+    /** @internal Current log level / 目前日誌層級 */
     static level = LogLevel.INFO;
+    /** @internal Prefix for all console outputs / 所有控制台輸出的前綴 */
     static prefix = "[WGFX]";
-
     /**
-     * Set the current log level
-     * 設定目前的日誌層級
-     * @param level - The log level to set (設定的日誌層級)
+     * Set the current log level.
+     * ---
+     * 設定目前的日誌過濾層級。低於此層級的日誌將不會被輸出。
+     *
+     * @group Configuration
+     * @param level - The target {@link LogLevel} / 目標日誌層級
      */
     static setLevel(level) {
         this.level = level;
     }
-
     /**
-     * Enable or disable debug mode
-     * 啟用或停用偵錯模式
-     * @param enabled - Whether to enable debug mode (是否啟用偵錯模式)
+     * Quickly enable or disable debug mode.
+     * ---
+     * 快速啟用或停用偵錯模式。
+     * 啟用後層級會設為 DEBUG，停用則恢復為 INFO。
+     *
+     * @group Configuration
+     * @param enabled - True to see all logs / 是否啟用偵錯模式
      */
     static setDebug(enabled) {
         this.level = enabled ? LogLevel.DEBUG : LogLevel.INFO;
     }
-
     /**
-     * Log a debug message
-     * 記錄偵錯訊息
-     * @param message - The message to log (要記錄的訊息)
-     * @param args - Additional arguments (額外參數)
+     * Log a debug message.
+     * ---
+     * 記錄偵錯訊息。僅在層級為 DEBUG 時顯示。
+     *
+     * @group Logging
+     * @param message - The debug message / 要記錄的偵錯訊息
+     * @param args - Additional contextual data / 額外的上下文參數
      */
     static debug(message, ...args) {
         if (this.level <= LogLevel.DEBUG) {
             console.debug(`${this.prefix} [DEBUG] ${message}`, ...args);
         }
     }
-
     /**
-     * Log an info message
-     * 記錄一般訊息
-     * @param message - The message to log (要記錄的訊息)
-     * @param args - Additional arguments (額外參數)
+     * Log an info message.
+     * ---
+     * 記錄一般資訊。適用於系統狀態更新。
+     *
+     * @group Logging
+     * @param message - The info message / 要記錄的一般訊息
+     * @param args - Additional data / 額外參數
      */
     static info(message, ...args) {
         if (this.level <= LogLevel.INFO) {
             console.log(`${this.prefix} [INFO] ${message}`, ...args);
         }
     }
-
     /**
-     * Log a warning message
-     * 記錄警告訊息
-     * @param message - The message to log (要記錄的訊息)
-     * @param args - Additional arguments (額外參數)
+     * Log a warning message.
+     * ---
+     * 記錄警告訊息。用於提醒可能存在但不會中斷執行的問題。
+     *
+     * @group Logging
+     * @param message - The warning message / 要記錄的警告訊息
+     * @param args - Additional data / 額外參數
      */
     static warn(message, ...args) {
         if (this.level <= LogLevel.WARN) {
             console.warn(`${this.prefix} [WARN] ${message}`, ...args);
         }
     }
-
     /**
-     * Log an error message
-     * 記錄錯誤訊息
-     * @param message - The message to log (要記錄的訊息)
-     * @param args - Additional arguments (額外參數)
+     * Log an error message.
+     * ---
+     * 記錄錯誤訊息。用於記錄導致功能失效或執行中斷的嚴重問題。
+     *
+     * @group Logging
+     * @param message - The error message / 要記錄的錯誤訊息
+     * @param args - Additional data or Error object / 額外參數或 Error 物件
      */
     static error(message, ...args) {
         if (this.level <= LogLevel.ERROR) {
@@ -885,7 +922,6 @@ class ResourceManager {
     uniformBuffer;
     /** @zh 場景資訊（寬高、解析度）Uniform 緩衝區 */
     sceneBuffer = null;
-
     /**
      * Initialize the resource manager.
      * ---
@@ -904,7 +940,6 @@ class ResourceManager {
         this.uniforms = new Map();
         this.uniformBuffer = null;
     }
-
     /**
      * Initialize resources based on shader info and external definitions.
      * ---
@@ -1029,7 +1064,6 @@ class ResourceManager {
         // 6. Create Scene Buffer / 建立場景資訊緩衝區
         this.createSceneBuffer();
     }
-
     /**
      * Create or update a texture and its dual views (Sampled & Storage).
      * ---
@@ -1054,7 +1088,6 @@ class ResourceManager {
         });
         return texture;
     }
-
     /**
      * Get a specific view of a texture by name and type.
      * ---
@@ -1072,7 +1105,6 @@ class ResourceManager {
         }
         return v[type];
     }
-
     /**
      * Get a GPUTexture object by name.
      * ---
@@ -1084,7 +1116,6 @@ class ResourceManager {
     getTexture(name) {
         return this.textures.get(name);
     }
-
     /**
      * Create and register a sampler.
      * ---
@@ -1098,7 +1129,6 @@ class ResourceManager {
         this.samplers.set(name, sampler);
         return sampler;
     }
-
     /**
      * Get a GPUSampler object by name.
      * ---
@@ -1109,7 +1139,6 @@ class ResourceManager {
     getSampler(name) {
         return this.samplers.get(name);
     }
-
     /**
      * Get uniform buffer segment info for a specific parameter.
      * ---
@@ -1120,7 +1149,6 @@ class ResourceManager {
     getUniform(name) {
         return this.uniforms.get(name);
     }
-
     /**
      * Update a texture's content from an external image source.
      * ---
@@ -1145,36 +1173,10 @@ class ResourceManager {
             this.updateSceneBuffer(width, height);
         }
     }
-
-    /**
-     * Create the main uniform buffer and map parameter offsets.
-     * ---
-     * 建立主要的 Uniform 緩衝區，並計算各參數在緩衝區中的偏移量（採 16 字節對齊）。
-     *
-     * @internal
-     */
-    createUniformBuffer(parameters) {
-        let offset = 0;
-        parameters.forEach(p => {
-            const size = 4; // Assume f32 / 假設為單精度浮點
-            this.uniforms.set(p.name, { buffer: null, offset, size });
-            offset += 16; // Maintain standard 16-byte alignment / 維持標準 16 位元組對齊
-        });
-        const bufferSize = Math.max(offset, 16);
-        this.uniformBuffer = this.device.createBuffer({
-            size: bufferSize,
-            usage: GPUBufferUsage.UNIFORM | GPUBufferUsage.COPY_DST,
-            label: 'GlobalUniforms'
-        });
-        // Link all parameters to this single buffer / 將所有參數關聯至此單一緩衝區
-        this.uniforms.forEach(u => u.buffer = this.uniformBuffer);
-    }
-
     /** @group Query */
     getUniformBuffer() {
         return this.uniformBuffer;
     }
-
     /**
      * Create the scene info uniform buffer (Width, Height, InvWidth, InvHeight).
      * ---
@@ -1191,7 +1193,6 @@ class ResourceManager {
             label: 'SceneInfo'
         });
     }
-
     /**
      * Update scene buffer with current source dimensions.
      * ---
@@ -1212,12 +1213,10 @@ class ResourceManager {
         this.device.queue.writeBuffer(this.sceneBuffer, 0, data);
         Logger.debug(`Updated scene buffer: ${width}x${height}`);
     }
-
     /** @group Query */
     getSceneBuffer() {
         return this.sceneBuffer;
     }
-
     /**
      * Dispose all textures and buffers to prevent memory leaks.
      * ---
@@ -1241,6 +1240,30 @@ class ResourceManager {
         this.uniforms.clear();
         Logger.info('ResourceManager: All resources disposed');
     }
+
+    /**
+     * Create the main uniform buffer and map parameter offsets.
+     * ---
+     * 建立主要的 Uniform 緩衝區，並計算各參數在緩衝區中的偏移量（採 16 字節對齊）。
+     *
+     * @internal
+     */
+    createUniformBuffer(parameters) {
+        let offset = 0;
+        parameters.forEach(p => {
+            const size = 4; // Assume f32 / 假設為單精度浮點
+            this.uniforms.set(p.name, {buffer: null, offset, size});
+            offset += 16; // Maintain standard 16-byte alignment / 維持標準 16 位元組對齊
+        });
+        const bufferSize = Math.max(offset, 16);
+        this.uniformBuffer = this.device.createBuffer({
+            size: bufferSize,
+            usage: GPUBufferUsage.UNIFORM | GPUBufferUsage.COPY_DST,
+            label: 'GlobalUniforms'
+        });
+        // Link all parameters to this single buffer / 將所有參數關聯至此單一緩衝區
+        this.uniforms.forEach(u => u.buffer = this.uniformBuffer);
+    }
 }
 
 /**
@@ -1260,7 +1283,6 @@ class PipelineManager {
         this.resourceManager = resourceManager;
         this.pipelines = new Map();
     }
-
     /**
      * Create pipelines for all shader modules.
      * ---
@@ -1360,7 +1382,6 @@ class PipelineManager {
             });
         }
     }
-
     /**
      * Dispatch a compute pass.
      * ---
@@ -1430,7 +1451,6 @@ class PipelineManager {
         passEncoder.dispatchWorkgroups(dx, dy, 1);
         passEncoder.end();
     }
-
     /**
      * Clear all cached pipelines.
      * ---
@@ -1446,20 +1466,18 @@ class PipelineManager {
 /**
  * Generator for WGSL shader code from parsed shader information.
  * ---
- * 從解析後的著色器資訊產生符合 WebGPU 規範的 WGSL 著色器代碼。
- * 負責注入標準變數（如 Uniforms, SceneInfo）並修正自動化轉換過程中的語法差異。
+ * 從解析後的著色器資訊產生 WGSL 著色器代碼。
+ * 負責注入標準資源、修正語法相容性並封裝計算著色器進入點。
  *
  * @group Core
  * @category Generators
  */
 class WGSLCodeGenerator {
     constructor() { }
-
     /**
      * Preprocess pass-specific code to fix common compatibility issues.
      * ---
      * 預處理特定通道的代碼，修正常見的 WGSL 相容性問題。
-     * 包含型別強制轉換（Cast）、變數重命名以及位移運算子修正。
      *
      * @internal
      * @param passCode - Original WGSL code / 原始 WGSL 代碼
@@ -1468,31 +1486,33 @@ class WGSLCodeGenerator {
      */
     _preprocessPassCode(passCode, passIndex) {
         let processedCode = passCode;
-        // Fix WGSL type error: vec2<u32> + f32 -> Needs MF2 cast
-        // 修正 WGSL 型別錯誤：無法直接讓 vec2<u32> 加 f32，需轉換為 MF2 (vec2<f32>)
+        // Fix WGSL type error: vec2<u32> + f32 -> Requires MF2 (vec2<f32>) cast
+        // 修正 WGSL 型別錯誤：無法讓 vec2<u32> 直接加 f32，需透過 MF2 轉換
         processedCode = processedCode.replace(/\(gxy \+ 0\.5f\)/g, '(MF2(gxy) + 0.5f)');
         // Map common aliases to WebGPU built-ins / 將常見別名映射至 WebGPU 內建變數
         processedCode = processedCode.replace(/threadId\.x/g, 'local_id.x');
-        // Fix vector bitwise shift: (vec2<u32> << u32) -> (vec2<u32> << vec2<u32>(u32))
-        // WGSL requires both sides of shift operator to be the same vector type
-        // 修正向量位移運算：WGSL 要求位移運算子兩側必須是相同的向量型別
+        // Legacy fixes for specific algorithm compatibility (e.g., Anime4K)
+        // 針對特定演算法（如 Anime4K）的舊版相容性修正
         if (passIndex >= 1) {
+            // Fix vector shift: (vec2<u32> << u32) -> (vec2<u32> << vec2<u32>(u32))
+            // WGSL requires both sides of bitwise shift to be the same vector type
+            // 修正向量位移運算：WGSL 要求位移運算子兩側必須是相同的向量型別
             processedCode = processedCode.replace(/(Rmp8x8\(local_id\.x\)\s*<<\s*)(\d+u)/g, '$1vec2<u32>($2)');
         }
-        // Fix variable redeclarations in max() calls / 修正 max() 呼叫中的變數重複宣告
+        // Fix variable redeclarations: change 'var x = max(x, ...)' to assignment
+        // 修正變數重複宣告：將含有重複 var 的語句改為純賦值操作
         processedCode = processedCode.replace(/var\s+([a-z0-9]+)\s+=\s+max\(\1,\s+MF4\(0\.0\)\);/g, '$1 = max($1, MF4(0.0));');
         return processedCode;
     }
-
     /**
-     * Generate complete WGSL modules for each rendering pass.
+     * Generate complete WGSL modules for each pass in the shader info.
      * ---
      * 為每個渲染通道產生完整的 WGSL 模組。
-     * 包含注入 Uniforms 結構體、SceneInfo 場景資訊以及自動管理資源綁定（Bindings）。
+     * 自動處理資源綁定索引（Binding Index）並注入全域 Uniforms。
      *
      * @group Generation
      * @param shaderInfo - The parsed shader metadata / 解析後的著色器元數據
-     * @returns List of generated modules / 產生的模組列表（含代碼與資源映射）
+     * @returns Array of generated modules / 產生的模組列表
      */
     generate(shaderInfo) {
         const generatedModules = [];
@@ -1500,16 +1520,16 @@ class WGSLCodeGenerator {
         const commonCode = shaderInfo.commonCode
             ? `// --- COMMON ---\n${shaderInfo.commonCode}\n\n`
             : '';
-        // 2. Generate Uniform Buffer Struct (std140 alignment)
-        // 產生 Uniform 緩衝區結構體（需符合 std140 對齊規範）
+        // 2. Generate Uniform Buffer Struct (Handled with 16-byte padding for std140)
+        // 產生 Uniform 結構體（手動加入填充以符合 std140 對齊規範）
         let uniformBufferCode = '';
         if (shaderInfo.parameters.length > 0) {
             uniformBufferCode += `struct Uniforms {\n`;
             shaderInfo.parameters.forEach(p => {
                 const type = p.type === 'int' ? 'i32' : 'f32';
                 uniformBufferCode += `    ${p.name}: ${type},\n`;
-                // Add padding for 16-byte alignment per field for simplicity in this engine
-                // 為了簡化對齊邏輯，每個欄位後方加入填充以維持 16 位元組對齊
+                // Padding ensures that each parameter starts at a 16-byte boundary
+                // 填充確保每個參數都從 16 位元組邊界開始，簡化內存佈局
                 uniformBufferCode += `    _pad_${p.name}_1: f32,\n`;
                 uniformBufferCode += `    _pad_${p.name}_2: f32,\n`;
                 uniformBufferCode += `    _pad_${p.name}_3: f32,\n`;
@@ -1517,22 +1537,22 @@ class WGSLCodeGenerator {
             uniformBufferCode += `};\n`;
             uniformBufferCode += `@group(0) @binding(1) var<uniform> uniforms: Uniforms;\n\n`;
         }
-        // 3. Generate SceneInfo Binding (Global resolution data)
-        // 產生場景資訊繫結（全域解析度數據）
+        // 3. Generate SceneInfo struct (Resolution data) / 產生場景資訊結構體（解析度數據）
         const sceneInfoCode = `struct SceneInfo {
-    inputSize: vec2<u32>,
-    inputPt: vec2<f32>,
-}
-@group(0) @binding(4) var<uniform> scene: SceneInfo;\n\n`;
-        // 4. Process each Pass / 處理每個通道
+        inputSize: vec2<u32>,
+        inputPt: vec2<f32>,
+        }
+        @group(0) @binding(4) var<uniform> scene: SceneInfo;\n\n`;
+        // 4. Process individual passes / 遍歷並處理各個通道
         shaderInfo.passes.forEach(pass => {
-            let wgsl = `// Pass ${pass.index} Generated by WGFX\n\n`;
+            let wgsl = `// Pass ${pass.index}\n\n`;
             wgsl += commonCode;
-            // Inject default sampler if not present / 若未定義則注入預設取樣器
+            // Inject default sampler if not defined in COMMON / 若共通代碼未定義則注入預設取樣器
             if (!commonCode.includes('var sam:') && !commonCode.includes('var sam :')) {
                 wgsl += `@group(0) @binding(0) var sam: sampler;\n\n`;
             }
             wgsl += uniformBufferCode;
+            // Inject SceneInfo if not defined in COMMON / 若共通代碼未定義則注入場景資訊
             if (!commonCode.includes('SceneInfo')) {
                 wgsl += sceneInfoCode;
             }
@@ -1542,11 +1562,12 @@ class WGSLCodeGenerator {
                 parameters: shaderInfo.parameters,
                 hasScene: true
             };
-            // Setup binding sequence (Start at 6 to avoid conflicts with 0, 1, 4)
-            // 設定綁定序列（從 6 開始以避免與預設的 0, 1, 4 衝突）
+            // Reserved bindings: 0 (Sampler), 1 (Uniforms), 4 (SceneInfo)
+            // Start dynamic bindings from index 6
+            // 預留綁定：0 (取樣器), 1 (Uniforms), 4 (場景資訊)，其餘資源從索引 6 開始
             let bindingIndex = 6;
-            // Texture bindings / 紋理綁定處理
             const usedTextureNames = new Set([...pass.in, ...pass.out]);
+            // Setup Texture Bindings / 設定紋理繫結
             shaderInfo.textures.forEach(tex => {
                 const isUsed = [...usedTextureNames].some(usedName => tex.name === usedName || tex.name.startsWith(usedName + "_"));
                 if (!isUsed)
@@ -1567,7 +1588,7 @@ class WGSLCodeGenerator {
                     isStorage: isStorage
                 });
             });
-            // Sampler bindings / 取樣器綁定處理
+            // Setup Additional Sampler Bindings / 設定額外的取樣器繫結
             shaderInfo.samplers.forEach(samp => {
                 if (samp.name !== 'sam') {
                     const currentBinding = bindingIndex++;
@@ -1575,26 +1596,27 @@ class WGSLCodeGenerator {
                     passResources.samplers.push({...samp, binding: currentBinding, group: 0});
                 }
             });
-            // Final Pass Code processing / 最終通道代碼處理
-            let processedPassCode = pass.code.replace(/\/\/!.*\n/g, ''); // Remove directives / 移除指令註解
+            wgsl += '\n';
+            // 5. Transform Pass Logic into main_cs / 將通道邏輯轉換為進入點函數 main_cs
+            let processedPassCode = pass.code.replace(/\/\/!.*\n/g, ''); // Remove meta directives / 移除元指令
             processedPassCode = this._preprocessPassCode(processedPassCode, pass.index);
-            // Rename entry point to main_cs / 將進入點函數重命名為 main_cs
+            // Rename PassX function to main_cs / 將函式 PassX 重新命名為 main_cs
             processedPassCode = processedPassCode.replace(new RegExp(`fn Pass${pass.index}`), `fn main_cs `);
-            // Inject blockStart variable if needed (Anime4K compatibility)
-            // 注入 blockStart 變數（Anime4K 相容性支援）
+            // Inject 'blockStart' for Anime4K shaders if needed
+            // 針對 Anime4K 著色器注入 'blockStart' 變數定義
             if (processedPassCode.includes('blockStart') && !processedPassCode.includes('let blockStart')) {
                 processedPassCode = processedPassCode.replace(/\{/, '{\n    let blockStart = workgroup_id.xy * 8u;');
             }
-            // Wrap in @compute attribute / 封裝計算著色器屬性
+            // Apply @compute attribute with workgroup size / 套用 @compute 屬性與工作群組大小
             const numThreads = pass.numThreads || [1, 1, 1];
+            processedPassCode = processedPassCode.replace(/@compute\s*@workgroup_size\([^)]+\)\s*/g, '');
             processedPassCode = `@compute @workgroup_size(${numThreads[0]}, ${numThreads[1]}, ${numThreads[2]}) ${processedPassCode}`;
-            wgsl += '\n' + processedPassCode;
+            wgsl += processedPassCode;
             generatedModules.push({
                 wgslCode: wgsl,
                 passIndex: pass.index,
                 resources: passResources
             });
-            Logger.debug(`Generated WGSL for Pass ${pass.index}`);
         });
         return generatedModules;
     }
@@ -1614,7 +1636,6 @@ class UniformBinder {
     device;
     /** @zh 資源管理員，用於檢索 Uniform 元數據 */
     resourceManager;
-
     /**
      * Initialize the uniform binder.
      * ---
@@ -1627,7 +1648,6 @@ class UniformBinder {
         this.device = device;
         this.resourceManager = resourceManager;
     }
-
     /**
      * Update a specific uniform value in the GPU buffer.
      * ---
@@ -1700,7 +1720,6 @@ class WGFXRuntime {
     uniformBinder;
     /** @zh 目前載入的特效元數據資訊，未編譯前為 null */
     shaderInfo;
-
     /**
      * Initialize the WGFX runtime environment.
      * ---
@@ -1722,7 +1741,6 @@ class WGFXRuntime {
         this.uniformBinder = new UniformBinder(this.device, this.resourceManager);
         this.shaderInfo = null;
     }
-
     /**
      * Compile effect code and initialize all GPU pipelines.
      * ---
@@ -1756,7 +1774,6 @@ class WGFXRuntime {
             throw e;
         }
     }
-
     /**
      * Dispatch a specific rendering pass to the GPU commands.
      * ---
@@ -1780,7 +1797,6 @@ class WGFXRuntime {
         // Delegate to pipeline manager / 委託給管線管理員執行
         this.pipelineManager.dispatchPass(passInfo, commandEncoder);
     }
-
     /**
      * Update a uniform value by its identifier name.
      * ---
@@ -1796,7 +1812,6 @@ class WGFXRuntime {
         }
         this.uniformBinder.updateUniform(name, value);
     }
-
     /**
      * Get the final output texture view for presentation or further processing.
      * ---
@@ -1813,7 +1828,6 @@ class WGFXRuntime {
         }
         return outputTexture.createView();
     }
-
     /**
      * Retrieve a resource (Texture, Sampler, or Buffer) by its name.
      * ---
@@ -1855,7 +1869,6 @@ class WGFX {
     height;
     /** @zh 目前輸入源物件 */
     currentInputSource;
-
     /**
      * @internal
      * Internal constructor. Use {@link WGFX.create} instead.
@@ -1868,7 +1881,6 @@ class WGFX {
         this.width = 0;
         this.height = 0;
     }
-
     /**
      * Enable or disable debug mode globally.
      * ---
@@ -1880,7 +1892,6 @@ class WGFX {
     static setDebug(enabled) {
         Logger.setDebug(enabled);
     }
-
     /**
      * Factory method to create and initialize a WGFX instance.
      * ---
@@ -1944,7 +1955,6 @@ class WGFX {
         Logger.info(`WGFX initialized: ${width}x${height}`);
         return instance;
     }
-
     /**
      * Get information about the initialized effect.
      * ---
@@ -1980,7 +1990,6 @@ class WGFX {
             passes: shaderInfo.passes.length
         };
     }
-
     /**
      * Update shader uniform values.
      * ---
@@ -2007,7 +2016,6 @@ class WGFX {
             }
         }
     }
-
     /**
      * Process an input source and return the output texture.
      * ---
@@ -2072,7 +2080,6 @@ class WGFX {
             throw error;
         }
     }
-
     /**
      * Get the texture view of the final output.
      * ---
@@ -2084,7 +2091,6 @@ class WGFX {
     getOutputView() {
         return this.runtime.getOutput();
     }
-
     /**
      * Dispose all resources and clean up.
      * ---
