@@ -118,12 +118,9 @@
             this.canvas.width = 1920;
             this.canvas.height = 1080;
 
+            // 關鍵修改：初始化時不設定 top/left，將由 syncPosition 動態更新
             Object.assign(this.canvas.style, {
                 position: 'absolute',
-                top: '0',
-                left: '0',
-                width: '100%',
-                height: '100%',
                 zIndex: '10',
                 pointerEvents: 'none',
                 objectFit: 'contain',
@@ -159,6 +156,43 @@
                 console.error("[VSR] Canvas 配置失敗", error);
                 this.configured = false;
                 return false;
+            }
+        }
+
+        /**
+         * 同步 Canvas 與 Video 元素的位置和尺寸
+         * @param {HTMLVideoElement} videoElement - Video 元素
+         * @param {HTMLElement} containerElement - 父容器元素
+         */
+        syncPosition(videoElement, containerElement) {
+            if (!this.canvas || !videoElement || !containerElement) {
+                console.warn("[VSR] syncPosition: 缺少必要元素");
+                return;
+            }
+
+            try {
+                // 獲取 Video 相對於視口的位置
+                const videoRect = videoElement.getBoundingClientRect();
+
+                // 獲取容器相對於視口的位置
+                const containerRect = containerElement.getBoundingClientRect();
+
+                // 計算 Video 相對於容器的偏移量
+                const offsetX = videoRect.left - containerRect.left;
+                const offsetY = videoRect.top - containerRect.top;
+
+                // 同步位置和尺寸
+                Object.assign(this.canvas.style, {
+                    left: `${offsetX}px`,
+                    top: `${offsetY}px`,
+                    width: `${videoRect.width}px`,
+                    height: `${videoRect.height}px`
+                });
+
+                console.log(`[VSR] Canvas 位置已同步: (${offsetX.toFixed(1)}, ${offsetY.toFixed(1)}), ${videoRect.width.toFixed(1)}x${videoRect.height.toFixed(1)}`);
+
+            } catch (error) {
+                console.error("[VSR] 位置同步失敗", error);
             }
         }
 
@@ -215,7 +249,6 @@
             this.configured = false;
         }
     }
-
     // ===================================================================
     // WGFX 處理引擎（封裝 WGFX 實例）
     // ===================================================================
@@ -539,6 +572,22 @@
             });
             this.resizeObserver.observe(this.videoElement);
 
+            // 新增：監聽視窗大小調整
+            this.windowResizeHandler = () => {
+                if (this.renderer) {
+                    this.renderer.syncPosition(this.videoElement, this.playerContainer);
+                }
+            };
+            window.addEventListener('resize', this.windowResizeHandler);
+
+            // 新增：監聽捲動事件（處理頁面捲動時的位置變化）
+            this.scrollHandler = () => {
+                if (this.renderer) {
+                    this.renderer.syncPosition(this.videoElement, this.playerContainer);
+                }
+            };
+            window.addEventListener('scroll', this.scrollHandler, {passive: true});
+
             // 視頻結束事件
             this.videoElement.addEventListener('ended', () => {
                 console.log("[VSR] 視頻已結束");
@@ -557,6 +606,17 @@
                 clearInterval(this.searchInterval);
                 this.searchInterval = null;
             }
+
+            // 清理視窗事件監聽器
+            if (this.windowResizeHandler) {
+                window.removeEventListener('resize', this.windowResizeHandler);
+                this.windowResizeHandler = null;
+            }
+
+            if (this.scrollHandler) {
+                window.removeEventListener('scroll', this.scrollHandler);
+                this.scrollHandler = null;
+            }
         }
 
         _handleResize() {
@@ -564,14 +624,10 @@
                 return;
             }
 
-            // 同步 DOM 尺寸
-            const rect = this.videoElement.getBoundingClientRect();
-            Object.assign(this.renderer.canvas.style, {
-                width: `${rect.width}px`,
-                height: `${rect.height}px`
-            });
+            // 關鍵修改：同步位置和尺寸
+            this.renderer.syncPosition(this.videoElement, this.playerContainer);
 
-            // 檢查解析度變化
+            // 檢查解析度變化（video 內部解析度，非 DOM 尺寸）
             const vw = this.videoElement.videoWidth;
             const vh = this.videoElement.videoHeight;
 
@@ -584,6 +640,8 @@
                 this._resizeDebounce = setTimeout(async () => {
                     if (this.state === 'RUNNING') {
                         await this._compileEffect();
+                        // 重新編譯後再次同步位置
+                        this.renderer.syncPosition(this.videoElement, this.playerContainer);
                     }
                 }, 300);
             }
@@ -593,6 +651,11 @@
 
         _startRenderLoop() {
             if (!this.videoElement) return;
+
+            // 初始化時同步一次位置
+            if (this.renderer) {
+                this.renderer.syncPosition(this.videoElement, this.playerContainer);
+            }
 
             const renderFrame = async () => {
                 if (this.state !== 'RUNNING') return;
@@ -613,7 +676,6 @@
 
             renderFrame();
         }
-
         _stopRenderLoop() {
             if (this.frameRequestId && this.videoElement) {
                 if (this.videoElement.cancelVideoFrameCallback) {
@@ -677,6 +739,7 @@
             return this.abortController?.signal.aborted;
         }
     }
+
 
     // ===================================================================
     // 訊息處理與初始化
