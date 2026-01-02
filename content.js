@@ -1,802 +1,342 @@
-// YouTube VSR - Refactored Architecture with WGFX Integration
+/**
+ * @file YouTube VSR - Content Script
+ * @description 整合 WGFX 引擎的 YouTube 影片超解析度處理器
+ */
+
 (async function () {
-    // === 防止重複注入 ===
-    if (window.vsrInjected) {
-        console.log("[VSR] 腳本已存在，跳過初始化");
-        return;
-    }
+    /** @type {boolean} 防止重複注入 */
+    if (window.vsrInjected) return;
     window.vsrInjected = true;
 
-    // === 模組載入 ===
+    // ===================================================================
+    // [1] VSRLogger - 外部日誌工具 (Host Logic)
+    // ===================================================================
+    const VSRLogger = {
+        _enabled: false,
+        _prefix: '%c[VSR-Host]',
+        _style: 'color: #00ffa2; font-weight: bold;', // 亮綠色
+
+        setDebug(enabled) {
+            this._enabled = enabled;
+        },
+        debug(msg, ...args) {
+            if (this._enabled) console.debug(this._prefix, this._style, msg, ...args);
+        },
+        info(msg, ...args) {
+            console.log(this._prefix, this._style, msg, ...args);
+        },
+        warn(msg, ...args) {
+            console.warn(this._prefix, this._style, `[WARN] ${msg}`, ...args);
+        },
+        error(msg, ...args) {
+            console.error(this._prefix, this._style, `[ERROR] ${msg}`, ...args);
+        }
+    };
+
+    // ===================================================================
+    // [2] 模組載入
+    // ===================================================================
     let WGFXClass;
     try {
         const moduleURL = chrome.runtime.getURL('wgfx.browser.esm.js');
         const module = await import(moduleURL);
         WGFXClass = module.default || module.WGFX;
 
-        if (!WGFXClass) {
-            throw new Error("WGFX 類別不存在");
-        }
-        console.log("[VSR] WGFX 模組已載入");
+        if (!WGFXClass) throw new Error("WGFX 類別加載失敗");
+        VSRLogger.info("WGFX 核心模組已就緒");
     } catch (error) {
-        console.error("[VSR] 模組載入失敗", error);
+        VSRLogger.error("初始化失敗，無法加載 WGFX 模組", error);
         return;
     }
 
     // ===================================================================
-    // WebGPU 設備管理器（單例模式）
+    // [3] 核心組件定義
     // ===================================================================
+
+    /**
+     * WebGPU Device Manager
+     * ---
+     * 單例模式管理 GPUDevice 生命週期。
+     */
     class GPUDeviceManager {
         constructor() {
             this.device = null;
             this.initPromise = null;
-            this.isDestroyed = false;
         }
 
         async initialize() {
-            // 使用快取避免重複初始化
-            if (this.initPromise) {
-                return this.initPromise;
-            }
-
-            this.initPromise = this._doInitialize();
-            return this.initPromise;
-        }
-
-        async _doInitialize() {
-            try {
-                if (!navigator.gpu) {
-                    throw new Error("瀏覽器不支援 WebGPU");
-                }
-
+            if (this.initPromise) return this.initPromise;
+            this.initPromise = (async () => {
+                if (!navigator.gpu) throw new Error("瀏覽器不支援 WebGPU");
                 const adapter = await navigator.gpu.requestAdapter();
-                if (!adapter) {
-                    throw new Error("無法取得 GPU 適配器");
-                }
+                if (!adapter) throw new Error("找不到 GPU 適配器");
 
                 this.device = await adapter.requestDevice({
                     requiredLimits: {
-                        maxStorageTexturesPerShaderStage: Math.min(
-                            8,
-                            adapter.limits.maxStorageTexturesPerShaderStage
-                        )
+                        maxStorageTexturesPerShaderStage: Math.min(8, adapter.limits.maxStorageTexturesPerShaderStage)
                     }
                 });
-
-                // 監聽設備遺失事件
-                this.device.lost.then((info) => {
-                    console.error("[VSR] GPU 設備遺失", info.reason, info.message);
-                    this.reset();
-                });
-
-                console.log("[VSR] GPU 設備初始化成功");
+                VSRLogger.info("WebGPU 設備已建立");
                 return this.device;
-
-            } catch (error) {
-                console.error("[VSR] GPU 設備初始化失敗", error);
-                this.initPromise = null;
-                throw error;
-            }
-        }
-
-        getDevice() {
-            return this.device;
-        }
-
-        reset() {
-            this.device = null;
-            this.initPromise = null;
-        }
-
-        destroy() {
-            if (this.device && !this.isDestroyed) {
-                try {
-                    this.device.destroy();
-                    console.log("[VSR] GPU 設備已銷毀");
-                } catch (error) {
-                    console.warn("[VSR] 設備銷毀失敗", error);
-                }
-                this.isDestroyed = true;
-            }
-            this.reset();
+            })();
+            return this.initPromise;
         }
     }
 
-    // ===================================================================
-    // Canvas 渲染器（封裝 WebGPU Context）
-    // ===================================================================
+    /**
+     * Canvas Renderer
+     * ---
+     * 負責將 GPU 紋理呈現至畫面的 Overlay Canvas。
+     */
     class CanvasRenderer {
         constructor(device) {
             this.device = device;
-            this.canvas = null;
-            this.context = null;
-            this.configured = false;
-        }
-
-        createCanvas() {
             this.canvas = document.createElement('canvas');
-            this.canvas.width = 1920;
-            this.canvas.height = 1080;
+            this.context = this.canvas.getContext('webgpu');
 
-            // 關鍵修改：初始化時不設定 top/left，將由 syncPosition 動態更新
             Object.assign(this.canvas.style, {
                 position: 'absolute',
                 zIndex: '10',
                 pointerEvents: 'none',
-                objectFit: 'contain',
                 display: 'none'
             });
-
-            this.context = this.canvas.getContext('webgpu');
-            console.log("[VSR] Canvas 已建立");
-            return this.canvas;
         }
 
         configure(width, height) {
-            if (!this.context || !this.device) return false;
-
-            try {
-                // 更新 canvas 解析度
-                this.canvas.width = width;
-                this.canvas.height = height;
-
-                // 配置 WebGPU context
-                this.context.configure({
-                    device: this.device,
-                    format: 'rgba16float',
-                    usage: GPUTextureUsage.RENDER_ATTACHMENT | GPUTextureUsage.COPY_DST,
-                    alphaMode: 'opaque'
-                });
-
-                this.configured = true;
-                console.log(`[VSR] Canvas 已配置: ${width}x${height}`);
-                return true;
-
-            } catch (error) {
-                console.error("[VSR] Canvas 配置失敗", error);
-                this.configured = false;
-                return false;
-            }
+            this.canvas.width = width;
+            this.canvas.height = height;
+            this.context.configure({
+                device: this.device,
+                format: 'rgba16float',
+                usage: GPUTextureUsage.RENDER_ATTACHMENT | GPUTextureUsage.COPY_DST,
+                alphaMode: 'opaque'
+            });
+            VSRLogger.debug(`Canvas 配置完成: ${width}x${height}`);
         }
 
-        /**
-         * 同步 Canvas 與 Video 元素的位置和尺寸
-         * @param {HTMLVideoElement} videoElement - Video 元素
-         * @param {HTMLElement} containerElement - 父容器元素
-         */
-        syncPosition(videoElement, containerElement) {
-            if (!this.canvas || !videoElement || !containerElement) {
-                console.warn("[VSR] syncPosition: 缺少必要元素");
-                return;
-            }
-
-            try {
-                // 獲取 Video 相對於視口的位置
-                const videoRect = videoElement.getBoundingClientRect();
-
-                // 獲取容器相對於視口的位置
-                const containerRect = containerElement.getBoundingClientRect();
-
-                // 計算 Video 相對於容器的偏移量
-                const offsetX = videoRect.left - containerRect.left;
-                const offsetY = videoRect.top - containerRect.top;
-
-                // 同步位置和尺寸
-                Object.assign(this.canvas.style, {
-                    left: `${offsetX}px`,
-                    top: `${offsetY}px`,
-                    width: `${videoRect.width}px`,
-                    height: `${videoRect.height}px`
-                });
-
-                console.log(`[VSR] Canvas 位置已同步: (${offsetX.toFixed(1)}, ${offsetY.toFixed(1)}), ${videoRect.width.toFixed(1)}x${videoRect.height.toFixed(1)}`);
-
-            } catch (error) {
-                console.error("[VSR] 位置同步失敗", error);
-            }
+        syncPosition(video, container) {
+            const vRect = video.getBoundingClientRect();
+            const cRect = container.getBoundingClientRect();
+            Object.assign(this.canvas.style, {
+                left: `${vRect.left - cRect.left}px`,
+                top: `${vRect.top - cRect.top}px`,
+                width: `${vRect.width}px`,
+                height: `${vRect.height}px`
+            });
         }
 
-        renderTexture(sourceTexture) {
-            if (!this.configured || !this.device || !this.context) {
-                return false;
-            }
-
-            try {
-                const canvasTexture = this.context.getCurrentTexture();
-
-                // 尺寸驗證
-                if (sourceTexture.width !== canvasTexture.width ||
-                    sourceTexture.height !== canvasTexture.height) {
-                    console.warn("[VSR] 紋理尺寸不匹配");
-                    return false;
-                }
-
-                // 複製紋理到 canvas
-                const encoder = this.device.createCommandEncoder();
-                encoder.copyTextureToTexture(
-                    { texture: sourceTexture },
-                    { texture: canvasTexture },
-                    [sourceTexture.width, sourceTexture.height]
-                );
-                this.device.queue.submit([encoder.finish()]);
-
-                return true;
-
-            } catch (error) {
-                console.error("[VSR] 渲染錯誤", error);
-                return false;
-            }
-        }
-
-        show() {
-            if (this.canvas) {
-                this.canvas.style.display = 'block';
-            }
-        }
-
-        hide() {
-            if (this.canvas) {
-                this.canvas.style.display = 'none';
-            }
-        }
-
-        dispose() {
-            if (this.canvas && this.canvas.parentElement) {
-                this.canvas.parentElement.removeChild(this.canvas);
-            }
-            this.canvas = null;
-            this.context = null;
-            this.configured = false;
+        render(sourceTexture) {
+            const encoder = this.device.createCommandEncoder();
+            encoder.copyTextureToTexture(
+                {texture: sourceTexture},
+                {texture: this.context.getCurrentTexture()},
+                [sourceTexture.width, sourceTexture.height]
+            );
+            this.device.queue.submit([encoder.finish()]);
         }
     }
-    // ===================================================================
-    // WGFX 處理引擎（封裝 WGFX 實例）
-    // ===================================================================
+
+    /**
+     * WGFX Processor
+     * ---
+     * 封裝 WGFX 實例，執行特效編譯與幀處理。
+     */
     class WGFXProcessor {
         constructor(device) {
             this.device = device;
             this.wgfx = null;
-            this.shaderCache = new Map();
-            this.effectCode = null;
-            this.parameters = {};
+            this.shaderCode = null;
         }
 
-        async compile(effectPath, width, height) {
-            // 載入著色器代碼（快取機制）
-            if (!this.shaderCache.has(effectPath)) {
-                const response = await fetch(chrome.runtime.getURL(effectPath));
-                if (!response.ok) {
-                    throw new Error(`著色器載入失敗: ${effectPath}`);
-                }
-                const code = await response.text();
-                this.shaderCache.set(effectPath, code);
+        async compile(effectPath, width, height, params = {}) {
+            if (!this.shaderCode) {
+                const resp = await fetch(chrome.runtime.getURL(effectPath));
+                this.shaderCode = await resp.text();
             }
 
-            this.effectCode = this.shaderCache.get(effectPath);
+            this.wgfx = await WGFXClass.create({
+                device: this.device,
+                effectCode: this.shaderCode,
+                width, height
+            });
 
-            // 建立 WGFX 實例
-            try {
-                const instance = await WGFXClass.create({
-                    device: this.device,
-                    effectCode: this.effectCode,
-                    width: width,
-                    height: height
-                });
-
-                // 初始化並提取參數資訊
-                const metadata = instance.initialize();
-                console.log(`[VSR] WGFX 編譯成功: ${width}x${height}, ${metadata.passes} passes`);
-
-                // 設定預設參數
-                if (metadata.uniforms) {
-                    metadata.uniforms.forEach(uniform => {
-                        if (this.parameters[uniform.name] === undefined) {
-                            this.parameters[uniform.name] = uniform.default;
-                        }
-                    });
-                    instance.updateUniforms(this.parameters);
-                }
-
-                this.wgfx = instance;
-                return metadata;
-
-            } catch (error) {
-                console.error("[VSR] WGFX 編譯失敗", error);
-                throw error;
-            }
+            this.wgfx.initialize();
+            this.wgfx.updateUniforms(params);
         }
 
-        updateParameter(name, value) {
-            this.parameters[name] = value;
-            if (this.wgfx) {
-                try {
-                    this.wgfx.updateUniforms({[name]: value});
-                } catch (error) {
-                    console.warn(`[VSR] 參數更新失敗: ${name}`, error);
-                }
-            }
-        }
-
-        async processFrame(inputSource) {
-            if (!this.wgfx) {
-                throw new Error("WGFX 未初始化");
-            }
-
-            try {
-                const outputTexture = await this.wgfx.process(inputSource);
-                return outputTexture;
-            } catch (error) {
-                console.error("[VSR] 幀處理失敗", error);
-                throw error;
-            }
+        async process(input) {
+            return await this.wgfx.process(input);
         }
 
         dispose() {
-            if (this.wgfx) {
-                try {
-                    this.wgfx.dispose();
-                    console.log("[VSR] WGFX 資源已釋放");
-                } catch (error) {
-                    console.warn("[VSR] WGFX 釋放失敗", error);
-                }
-                this.wgfx = null;
-            }
-            this.effectCode = null;
+            this.wgfx?.dispose();
+            this.wgfx = null;
         }
     }
 
     // ===================================================================
-    // 主控制器（生命週期管理）
+    // [4] 主控制器 (生命週期與日誌切換)
     // ===================================================================
+
     class VSRController {
         constructor() {
-            this.state = 'IDLE'; // IDLE | SEARCHING | READY | RUNNING | STOPPED
-            this.abortController = null;
-
-            // 核心元件
+            this.state = 'IDLE';
             this.deviceManager = new GPUDeviceManager();
             this.renderer = null;
             this.processor = null;
-
-            // DOM 元素
-            this.videoElement = null;
-            this.playerContainer = null;
-
-            // 配置
-            this.pipeline = [];
-            this.currentEffectPath = null;
-
-            // 觀察器
-            this.resizeObserver = null;
-            this.searchInterval = null;
-
-            // 渲染狀態
-            this.frameRequestId = null;
+            this.video = null;
+            this.container = null;
+            this.frameId = null;
         }
 
-        // === 公開介面 ===
-
+        /**
+         * 啟動系統並應用雙重日誌設定
+         */
         async start() {
-            if (this.state === 'RUNNING') {
-                console.log("[VSR] 已在運行中");
-                return;
-            }
-
-            console.log("[VSR] 啟動系統...");
-            this.state = 'SEARCHING';
-            this.abortController = new AbortController();
+            if (this.state === 'RUNNING') return;
+            VSRLogger.info("系統啟動中...");
 
             try {
-                // 1. 尋找視頻元素
-                await this._findVideoElement();
-                if (this._isAborted()) return;
+                // 1. 載入設定與日誌開關
+                const config = await chrome.storage.local.get(['pipeline', 'debugVSR', 'debugWGFX']);
 
-                // 2. 初始化 GPU
-                await this.deviceManager.initialize();
-                if (this._isAborted()) return;
+                // --- 日誌切換處 ---
+                VSRLogger.setDebug(!!config.debugVSR);
+                if (WGFXClass.setDebug) {
+                    WGFXClass.setDebug(!!config.debugWGFX);
+                }
+                VSRLogger.debug("日誌系統已更新: VSR=", !!config.debugVSR, "WGFX=", !!config.debugWGFX);
 
-                // 3. 建立渲染器
-                this.renderer = new CanvasRenderer(this.deviceManager.getDevice());
-                const canvas = this.renderer.createCanvas();
-                this.playerContainer.appendChild(canvas);
+                // 2. 獲取元素
+                await this._findElements();
 
-                // 4. 載入管線設定
-                await this._loadPipelineConfig();
-                if (this._isAborted()) return;
+                // 3. 初始化 GPU
+                const device = await this.deviceManager.initialize();
 
-                // 5. 編譯特效
-                await this._compileEffect();
-                if (this._isAborted()) return;
+                // 4. 建立渲染器與處理器
+                this.renderer = new CanvasRenderer(device);
+                this.container.appendChild(this.renderer.canvas);
 
-                // 6. 設置監聽
+                const pipeline = config.pipeline?.[0];
+                if (!pipeline) throw new Error("無效的管線配置");
+
+                this.processor = new WGFXProcessor(device);
+                await this.processor.compile(
+                    pipeline.path,
+                    this.video.videoWidth,
+                    this.video.videoHeight,
+                    pipeline.params
+                );
+
+                this.renderer.configure(this.video.videoWidth, this.video.videoHeight);
+
+                // 5. 啟動監聽與循環
                 this._setupObservers();
-
-                // 7. 啟動渲染
                 this.state = 'RUNNING';
-                this._startRenderLoop();
-                this._hideOriginalVideo();
+                this._renderLoop();
+                this.video.style.opacity = '0';
 
-                console.log("[VSR] 系統已啟動");
-
-            } catch (error) {
-                console.error("[VSR] 啟動失敗", error);
-                await this.stop();
+                VSRLogger.info("VSR 運行中");
+            } catch (err) {
+                VSRLogger.error("啟動失敗", err);
+                this.stop();
             }
         }
 
         async stop() {
-            console.log("[VSR] 停止系統...");
+            VSRLogger.info("系統停止中...");
+            if (this.frameId) cancelAnimationFrame(this.frameId);
+            this.resizeObserver?.disconnect();
 
-            // 中止進行中的操作
-            if (this.abortController) {
-                this.abortController.abort();
-            }
-
-            // 停止渲染
-            this._stopRenderLoop();
-
-            // 釋放資源（順序很重要）
-            this._cleanupObservers();
-
-            if (this.processor) {
-                this.processor.dispose();
-                this.processor = null;
-            }
-
-            if (this.renderer) {
-                this.renderer.dispose();
-                this.renderer = null;
-            }
-
-            // 恢復原始畫面
-            this._showOriginalVideo();
-
-            // 清理 DOM 引用
-            this.videoElement = null;
-            this.playerContainer = null;
+            this.processor?.dispose();
+            this.renderer?.canvas?.remove();
+            if (this.video) this.video.style.opacity = '1';
 
             this.state = 'STOPPED';
-            console.log("[VSR] 系統已停止");
         }
 
-        async updatePipeline(newPipeline) {
-            this.pipeline = newPipeline || [];
+        // --- 內部渲染與監聽邏輯 ---
 
-            if (this.state !== 'RUNNING') {
-                return;
-            }
+        _renderLoop() {
+            const frameFunc = async () => {
+                if (this.state !== 'RUNNING') return;
 
-            console.log("[VSR] 更新管線...");
+                let frameSource = null;
+                try {
+                    // 同步位置
+                    this.renderer.syncPosition(this.video, this.container);
 
-            // 釋放舊的處理器
-            if (this.processor) {
-                this.processor.dispose();
-                this.processor = null;
-            }
+                    // 獲取幀
+                    frameSource = (typeof VideoFrame !== 'undefined')
+                        ? new VideoFrame(this.video)
+                        : await createImageBitmap(this.video);
 
-            // 重新編譯
-            try {
-                await this._compileEffect();
-            } catch (error) {
-                console.error("[VSR] 管線更新失敗", error);
-            }
+                    const output = await this.processor.process(frameSource);
+                    this.renderer.render(output);
+                    this.renderer.canvas.style.display = 'block';
+                } catch (e) {
+                    VSRLogger.debug("幀跳過", e.message);
+                } finally {
+                    frameSource?.close?.();
+                }
+
+                this.frameId = this.video.requestVideoFrameCallback
+                    ? this.video.requestVideoFrameCallback(frameFunc)
+                    : requestAnimationFrame(frameFunc);
+            };
+            frameFunc();
         }
 
-        updateParameter(name, value) {
-            if (this.processor) {
-                this.processor.updateParameter(name, value);
-            }
-        }
-
-        // === 私有方法 ===
-
-        async _findVideoElement() {
+        async _findElements() {
             return new Promise((resolve, reject) => {
-                let attempts = 0;
-                const maxAttempts = 20;
-
-                this.searchInterval = setInterval(() => {
-                    if (this._isAborted()) {
-                        clearInterval(this.searchInterval);
-                        reject(new Error("搜尋已中止"));
-                        return;
-                    }
-
-                    const player = document.querySelector('.html5-video-player');
-                    const video = document.querySelector('video');
-
-                    if (player && video && video.readyState >= 1) {
-                        clearInterval(this.searchInterval);
-                        this.playerContainer = player;
-                        this.videoElement = video;
-                        console.log("[VSR] 視頻元素已找到");
+                const check = () => {
+                    const v = document.querySelector('video');
+                    const c = document.querySelector('.html5-video-player');
+                    if (v && c && v.readyState >= 1) {
+                        this.video = v;
+                        this.container = c;
                         resolve();
-                        return;
+                    } else {
+                        setTimeout(check, 500);
                     }
-
-                    attempts++;
-                    if (attempts >= maxAttempts) {
-                        clearInterval(this.searchInterval);
-                        reject(new Error("找不到視頻元素"));
-                    }
-                }, 500);
+                };
+                check();
+                setTimeout(() => reject(new Error("尋找元素超時")), 10000);
             });
-        }
-
-        async _loadPipelineConfig() {
-            if (this.pipeline.length === 0) {
-                const settings = await chrome.storage.local.get(['pipeline']);
-                this.pipeline = settings.pipeline || [];
-            }
-
-            if (this.pipeline.length > 0) {
-                this.currentEffectPath = this.pipeline[0].path;
-            }
-        }
-
-        async _compileEffect() {
-            if (!this.currentEffectPath) {
-                console.warn("[VSR] 無可用特效");
-                return;
-            }
-
-            const width = this.videoElement.videoWidth;
-            const height = this.videoElement.videoHeight;
-
-            if (width === 0 || height === 0) {
-                throw new Error("視頻尺寸無效");
-            }
-
-            // 建立處理器
-            this.processor = new WGFXProcessor(this.deviceManager.getDevice());
-
-            // 編譯特效
-            await this.processor.compile(this.currentEffectPath, width, height);
-
-            // 配置渲染器
-            this.renderer.configure(width, height);
-
-            // 應用參數
-            const effectConfig = this.pipeline[0];
-            if (effectConfig.params) {
-                Object.entries(effectConfig.params).forEach(([name, value]) => {
-                    this.processor.updateParameter(name, value);
-                });
-            }
         }
 
         _setupObservers() {
-            // 尺寸監聽
             this.resizeObserver = new ResizeObserver(() => {
-                this._handleResize();
+                const {videoWidth: w, videoHeight: h} = this.video;
+                if (w !== this.renderer.canvas.width || h !== this.renderer.canvas.height) {
+                    VSRLogger.info(`解析度變更: ${w}x${h}，重新編譯...`);
+                    this.stop().then(() => this.start());
+                }
             });
-            this.resizeObserver.observe(this.videoElement);
-
-            // 新增：監聽視窗大小調整
-            this.windowResizeHandler = () => {
-                if (this.renderer) {
-                    this.renderer.syncPosition(this.videoElement, this.playerContainer);
-                }
-            };
-            window.addEventListener('resize', this.windowResizeHandler);
-
-            // 新增：監聽捲動事件（處理頁面捲動時的位置變化）
-            this.scrollHandler = () => {
-                if (this.renderer) {
-                    this.renderer.syncPosition(this.videoElement, this.playerContainer);
-                }
-            };
-            window.addEventListener('scroll', this.scrollHandler, {passive: true});
-
-            // 視頻結束事件
-            this.videoElement.addEventListener('ended', () => {
-                console.log("[VSR] 視頻已結束");
-                chrome.runtime.sendMessage({command: 'videoEnded'}).catch(() => {
-                });
-            }, {once: true});
-        }
-
-        _cleanupObservers() {
-            if (this.resizeObserver) {
-                this.resizeObserver.disconnect();
-                this.resizeObserver = null;
-            }
-
-            if (this.searchInterval) {
-                clearInterval(this.searchInterval);
-                this.searchInterval = null;
-            }
-
-            // 清理視窗事件監聽器
-            if (this.windowResizeHandler) {
-                window.removeEventListener('resize', this.windowResizeHandler);
-                this.windowResizeHandler = null;
-            }
-
-            if (this.scrollHandler) {
-                window.removeEventListener('scroll', this.scrollHandler);
-                this.scrollHandler = null;
-            }
-        }
-
-        _handleResize() {
-            if (!this.videoElement || !this.renderer || !this.renderer.canvas) {
-                return;
-            }
-
-            // 關鍵修改：同步位置和尺寸
-            this.renderer.syncPosition(this.videoElement, this.playerContainer);
-
-            // 檢查解析度變化（video 內部解析度，非 DOM 尺寸）
-            const vw = this.videoElement.videoWidth;
-            const vh = this.videoElement.videoHeight;
-
-            if (vw > 0 && vh > 0 &&
-                (this.renderer.canvas.width !== vw || this.renderer.canvas.height !== vh)) {
-                console.log(`[VSR] 解析度變更: ${vw}x${vh}`);
-
-                // 防抖重新編譯
-                clearTimeout(this._resizeDebounce);
-                this._resizeDebounce = setTimeout(async () => {
-                    if (this.state === 'RUNNING') {
-                        await this._compileEffect();
-                        // 重新編譯後再次同步位置
-                        this.renderer.syncPosition(this.videoElement, this.playerContainer);
-                    }
-                }, 300);
-            }
-        }
-
-        // === 渲染循環 ===
-
-        _startRenderLoop() {
-            if (!this.videoElement) return;
-
-            // 初始化時同步一次位置
-            if (this.renderer) {
-                this.renderer.syncPosition(this.videoElement, this.playerContainer);
-            }
-
-            const renderFrame = async () => {
-                if (this.state !== 'RUNNING') return;
-
-                try {
-                    await this._processAndRender();
-                } catch (error) {
-                    console.warn("[VSR] 渲染錯誤", error);
-                }
-
-                // 使用 rVFC 提升效能
-                if (this.videoElement.requestVideoFrameCallback) {
-                    this.frameRequestId = this.videoElement.requestVideoFrameCallback(renderFrame);
-                } else {
-                    this.frameRequestId = requestAnimationFrame(renderFrame);
-                }
-            };
-
-            renderFrame();
-        }
-        _stopRenderLoop() {
-            if (this.frameRequestId && this.videoElement) {
-                if (this.videoElement.cancelVideoFrameCallback) {
-                    this.videoElement.cancelVideoFrameCallback(this.frameRequestId);
-                } else {
-                    cancelAnimationFrame(this.frameRequestId);
-                }
-                this.frameRequestId = null;
-            }
-        }
-
-        async _processAndRender() {
-            if (!this.processor || !this.renderer) {
-                // 降級顯示
-                this.renderer?.hide();
-                this._showOriginalVideo();
-                return;
-            }
-
-            let frame = null;
-            try {
-                // 建立 VideoFrame（高效能）
-                if (typeof VideoFrame !== 'undefined') {
-                    frame = new VideoFrame(this.videoElement);
-                } else {
-                    frame = await createImageBitmap(this.videoElement);
-                }
-
-                // 處理幀
-                const outputTexture = await this.processor.processFrame(frame);
-
-                // 渲染到 canvas
-                const success = this.renderer.renderTexture(outputTexture);
-
-                if (success) {
-                    this.renderer.show();
-                    this._hideOriginalVideo();
-                }
-
-            } finally {
-                // 釋放 frame
-                if (frame?.close) {
-                    frame.close();
-                }
-            }
-        }
-
-        _hideOriginalVideo() {
-            if (this.videoElement) {
-                this.videoElement.style.opacity = '0';
-            }
-        }
-
-        _showOriginalVideo() {
-            if (this.videoElement) {
-                this.videoElement.style.opacity = '1';
-            }
-        }
-
-        _isAborted() {
-            return this.abortController?.signal.aborted;
+            this.resizeObserver.observe(this.video);
         }
     }
 
-
     // ===================================================================
-    // 訊息處理與初始化
+    // [5] 啟動與訊息監聽
     // ===================================================================
+    const vsr = new VSRController();
 
-    const controller = new VSRController();
-
-    // Chrome 擴充功能訊息處理
-    chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
-        (async () => {
-            try {
-                switch (request.command) {
-                    case 'setEnable':
-                        if (request.isEnabled) {
-                            await controller.start();
-                            sendResponse({status: 'started'});
-                        } else {
-                            await controller.stop();
-                            sendResponse({status: 'stopped'});
-                        }
-                        break;
-
-                    case 'setPipeline':
-                        await controller.updatePipeline(request.pipeline);
-                        sendResponse({status: 'ok'});
-                        break;
-
-                    case 'updateParameter':
-                        controller.updateParameter(request.paramName, request.value);
-                        sendResponse({status: 'ok'});
-                        break;
-
-                    case 'navigation':
-                        console.log('[VSR] 偵測到導航事件');
-                        await controller.stop();
-                        setTimeout(() => controller.start(), 100);
-                        break;
-
-                    default:
-                        sendResponse({status: 'unknown_command'});
-                }
-            } catch (error) {
-                console.error('[VSR] 訊息處理錯誤', error);
-                sendResponse({status: 'error', message: error.message});
-            }
-        })();
-
-        return true; // 保持訊息通道開啟
-    });
-
-    // 初始狀態檢查
-    chrome.storage.local.get('isEnabled', (result) => {
-        if (result.isEnabled) {
-            controller.start();
+    chrome.runtime.onMessage.addListener((msg, sender, sendResponse) => {
+        if (msg.command === 'setEnable') {
+            msg.isEnabled ? vsr.start() : vsr.stop();
+        } else if (msg.command === 'updateParameter') {
+            vsr.processor?.wgfx?.updateUniforms({[msg.paramName]: msg.value});
         }
+        sendResponse({status: 'received'});
+        return true;
     });
 
-    console.log("[VSR] 腳本已就緒");
+    // 初始啟動檢查
+    chrome.storage.local.get('isEnabled', (res) => {
+        if (res.isEnabled) vsr.start();
+    });
+
+    VSRLogger.info("Content Script 已注入");
 
 })();
