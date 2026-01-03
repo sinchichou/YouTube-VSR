@@ -983,11 +983,13 @@ class ResourceManager {
                     if (key in ctx)
                         return ctx[key];
                     throw new Error(`Undefined variable: ${key}`);
-                } else if (/[0-9.]/.test(expr[pos])) { // Handle constants / 處理常數
+                }
+                else if (/[0-9.]/.test(expr[pos])) { // Handle constants / 處理常數
                     while (pos < expr.length && /[0-9.]/.test(expr[pos]))
                         pos++;
                     return parseFloat(expr.slice(startKey, pos));
-                } else if (expr[pos] === '(') { // Handle parenthesis / 處理括號
+                }
+                else if (expr[pos] === '(') { // Handle parenthesis / 處理括號
                     pos++;
                     const val = parseExpression();
                     pos++; // skip ')'
@@ -1158,7 +1160,7 @@ class ResourceManager {
      * @param name - Target texture name (usually 'INPUT') / 目標紋理名稱
      * @param source - Source visual element / 來源影像元素
      */
-    updateTextureFromImage(name, source) {
+    updateTextureFromImage(name, source, outWidth, outHeight) {
         const texture = this.textures.get(name);
         if (!texture) {
             Logger.warn(`Texture ${name} not found`);
@@ -1170,7 +1172,15 @@ class ResourceManager {
         if (name === 'INPUT' && (source instanceof HTMLVideoElement || source instanceof ImageBitmap || source instanceof VideoFrame)) {
             const width = (source instanceof VideoFrame) ? source.displayWidth : source.width;
             const height = (source instanceof VideoFrame) ? source.displayHeight : source.height;
-            this.updateSceneBuffer(width, height);
+            // Use provided output dimensions or fallback to OUTPUT texture dimensions / 使用提供的輸出維度或獲取輸出紋理維度
+            let outW = outWidth;
+            let outH = outHeight;
+            if (outW === undefined || outH === undefined) {
+                const output = this.textures.get('OUTPUT');
+                outW = output ? output.width : width;
+                outH = output ? output.height : height;
+            }
+            this.updateSceneBuffer(width, height, outW, outH);
         }
     }
     /** @group Query */
@@ -1188,7 +1198,7 @@ class ResourceManager {
         if (this.sceneBuffer)
             return;
         this.sceneBuffer = this.device.createBuffer({
-            size: 16, // 4 * float32
+            size: 40, // Expanded for SceneInfo struct
             usage: GPUBufferUsage.UNIFORM | GPUBufferUsage.COPY_DST,
             label: 'SceneInfo'
         });
@@ -1200,18 +1210,33 @@ class ResourceManager {
      *
      * @group Update
      */
-    updateSceneBuffer(width, height) {
+    updateSceneBuffer(width, height, outWidth = 0, outHeight = 0) {
         if (!this.sceneBuffer || width === 0 || height === 0)
             return;
-        const data = new ArrayBuffer(16);
+        if (outWidth === 0)
+            outWidth = width;
+        if (outHeight === 0)
+            outHeight = height;
+        const data = new ArrayBuffer(40);
         const u32 = new Uint32Array(data);
         const f32 = new Float32Array(data);
-        u32[0] = width; // width
-        u32[1] = height; // height
-        f32[2] = 1.0 / width; // 1.0 / width
-        f32[3] = 1.0 / height; // 1.0 / height
+        // inputSize: uint2 (8 bytes)
+        u32[0] = width;
+        u32[1] = height;
+        // inputPt: MF2 (8 bytes)
+        f32[2] = 1.0 / width;
+        f32[3] = 1.0 / height;
+        // outputSize: uint2 (8 bytes)
+        u32[4] = outWidth;
+        u32[5] = outHeight;
+        // outputPt: MF2 (8 bytes)
+        f32[6] = 1.0 / outWidth;
+        f32[7] = 1.0 / outHeight;
+        // scale: MF2 (8 bytes)
+        f32[8] = outWidth / width;
+        f32[9] = outHeight / height;
         this.device.queue.writeBuffer(this.sceneBuffer, 0, data);
-        Logger.debug(`Updated scene buffer: ${width}x${height}`);
+        Logger.debug(`Updated scene buffer: IN(${width}x${height}), OUT(${outWidth}x${outHeight}), SCALE(${f32[8].toFixed(2)}, ${f32[9].toFixed(2)})`);
     }
     /** @group Query */
     getSceneBuffer() {
@@ -1240,7 +1265,6 @@ class ResourceManager {
         this.uniforms.clear();
         Logger.info('ResourceManager: All resources disposed');
     }
-
     /**
      * Create the main uniform buffer and map parameter offsets.
      * ---
@@ -1252,7 +1276,7 @@ class ResourceManager {
         let offset = 0;
         parameters.forEach(p => {
             const size = 4; // Assume f32 / 假設為單精度浮點
-            this.uniforms.set(p.name, {buffer: null, offset, size});
+            this.uniforms.set(p.name, { buffer: null, offset, size });
             offset += 16; // Maintain standard 16-byte alignment / 維持標準 16 位元組對齊
         });
         const bufferSize = Math.max(offset, 16);
@@ -1473,36 +1497,7 @@ class PipelineManager {
  * @category Generators
  */
 class WGSLCodeGenerator {
-    constructor() { }
-    /**
-     * Preprocess pass-specific code to fix common compatibility issues.
-     * ---
-     * 預處理特定通道的代碼，修正常見的 WGSL 相容性問題。
-     *
-     * @internal
-     * @param passCode - Original WGSL code / 原始 WGSL 代碼
-     * @param passIndex - Index of the current pass / 目前通道的索引
-     * @returns Processed WGSL code / 處理後的 WGSL 代碼
-     */
-    _preprocessPassCode(passCode, passIndex) {
-        let processedCode = passCode;
-        // Fix WGSL type error: vec2<u32> + f32 -> Requires MF2 (vec2<f32>) cast
-        // 修正 WGSL 型別錯誤：無法讓 vec2<u32> 直接加 f32，需透過 MF2 轉換
-        processedCode = processedCode.replace(/\(gxy \+ 0\.5f\)/g, '(MF2(gxy) + 0.5f)');
-        // Map common aliases to WebGPU built-ins / 將常見別名映射至 WebGPU 內建變數
-        processedCode = processedCode.replace(/threadId\.x/g, 'local_id.x');
-        // Legacy fixes for specific algorithm compatibility (e.g., Anime4K)
-        // 針對特定演算法（如 Anime4K）的舊版相容性修正
-        if (passIndex >= 1) {
-            // Fix vector shift: (vec2<u32> << u32) -> (vec2<u32> << vec2<u32>(u32))
-            // WGSL requires both sides of bitwise shift to be the same vector type
-            // 修正向量位移運算：WGSL 要求位移運算子兩側必須是相同的向量型別
-            processedCode = processedCode.replace(/(Rmp8x8\(local_id\.x\)\s*<<\s*)(\d+u)/g, '$1vec2<u32>($2)');
-        }
-        // Fix variable redeclarations: change 'var x = max(x, ...)' to assignment
-        // 修正變數重複宣告：將含有重複 var 的語句改為純賦值操作
-        processedCode = processedCode.replace(/var\s+([a-z0-9]+)\s+=\s+max\(\1,\s+MF4\(0\.0\)\);/g, '$1 = max($1, MF4(0.0));');
-        return processedCode;
+    constructor() {
     }
     /**
      * Generate complete WGSL modules for each pass in the shader info.
@@ -1538,9 +1533,15 @@ class WGSLCodeGenerator {
             uniformBufferCode += `@group(0) @binding(1) var<uniform> uniforms: Uniforms;\n\n`;
         }
         // 3. Generate SceneInfo struct (Resolution data) / 產生場景資訊結構體（解析度數據）
-        const sceneInfoCode = `struct SceneInfo {
-        inputSize: vec2<u32>,
-        inputPt: vec2<f32>,
+        const sceneInfoCode = `alias vec2<u32> uint2;
+        alias vec2<f32> MF2;
+
+        struct SceneInfo {
+            inputSize: uint2,
+            inputPt: MF2,
+            outputSize: uint2,
+            outputPt: MF2,
+            scale: MF2,
         }
         @group(0) @binding(4) var<uniform> scene: SceneInfo;\n\n`;
         // 4. Process individual passes / 遍歷並處理各個通道
@@ -1593,7 +1594,7 @@ class WGSLCodeGenerator {
                 if (samp.name !== 'sam') {
                     const currentBinding = bindingIndex++;
                     wgsl += `@group(0) @binding(${currentBinding}) var ${samp.name}: sampler;\n`;
-                    passResources.samplers.push({...samp, binding: currentBinding, group: 0});
+                    passResources.samplers.push({ ...samp, binding: currentBinding, group: 0 });
                 }
             });
             wgsl += '\n';
@@ -1619,6 +1620,36 @@ class WGSLCodeGenerator {
             });
         });
         return generatedModules;
+    }
+    /**
+     * Preprocess pass-specific code to fix common compatibility issues.
+     * ---
+     * 預處理特定通道的代碼，修正常見的 WGSL 相容性問題。
+     *
+     * @internal
+     * @param passCode - Original WGSL code / 原始 WGSL 代碼
+     * @param passIndex - Index of the current pass / 目前通道的索引
+     * @returns Processed WGSL code / 處理後的 WGSL 代碼
+     */
+    _preprocessPassCode(passCode, passIndex) {
+        let processedCode = passCode;
+        // Fix WGSL type error: vec2<u32> + f32 -> Requires MF2 (vec2<f32>) cast
+        // 修正 WGSL 型別錯誤：無法讓 vec2<u32> 直接加 f32，需透過 MF2 轉換
+        processedCode = processedCode.replace(/\(gxy \+ 0\.5f\)/g, '(MF2(gxy) + 0.5f)');
+        // Map common aliases to WebGPU built-ins / 將常見別名映射至 WebGPU 內建變數
+        processedCode = processedCode.replace(/threadId\.x/g, 'local_id.x');
+        // Legacy fixes for specific algorithm compatibility (e.g., Anime4K)
+        // 針對特定演算法（如 Anime4K）的舊版相容性修正
+        if (passIndex >= 1) {
+            // Fix vector shift: (vec2<u32> << u32) -> (vec2<u32> << vec2<u32>(u32))
+            // WGSL requires both sides of bitwise shift to be the same vector type
+            // 修正向量位移運算：WGSL 要求位移運算子兩側必須是相同的向量型別
+            processedCode = processedCode.replace(/(Rmp8x8\(local_id\.x\)\s*<<\s*)(\d+u)/g, '$1vec2<u32>($2)');
+        }
+        // Fix variable redeclarations: change 'var x = max(x, ...)' to assignment
+        // 修正變數重複宣告：將含有重複 var 的語句改為純賦值操作
+        processedCode = processedCode.replace(/var\s+([a-z0-9]+)\s+=\s+max\(\1,\s+MF4\(0\.0\)\);/g, '$1 = max($1, MF4(0.0));');
+        return processedCode;
     }
 }
 
@@ -1687,10 +1718,10 @@ class UniformBinder {
         // We use the queue to schedule the data transfer
         // 我們使用隊列（Queue）來排程數據傳輸
         this.device.queue.writeBuffer(buffer, // Target GPU buffer / 目標 GPU 緩衝區
-            offset, // Byte offset in buffer / 緩衝區中的位元組偏移量
-            data.buffer, // Source array buffer / 來源陣列緩衝區
-            data.byteOffset, // Offset in source data / 來源數據的起始偏移
-            data.byteLength // Total bytes to copy / 要拷貝的總位元組長度
+        offset, // Byte offset in buffer / 緩衝區中的位元組偏移量
+        data.buffer, // Source array buffer / 來源陣列緩衝區
+        data.byteOffset, // Offset in source data / 來源數據的起始偏移
+        data.byteLength // Total bytes to copy / 要拷貝的總位元組長度
         );
         // Debugging log for sensitive updates / 針對敏感更新的偵錯記錄
         // Logger.debug(`Uniform updated: ${name} at offset ${offset}`);
@@ -1893,6 +1924,17 @@ class WGFX {
         Logger.setDebug(enabled);
     }
     /**
+     * Set the current log level globally.
+     * ---
+     * 全域設定目前日誌層級。
+     *
+     * @group Configuration
+     * @param level - The target {@link LogLevel} / 目標日誌層級
+     */
+    static setLevel(level) {
+        Logger.setLevel(level);
+    }
+    /**
      * Factory method to create and initialize a WGFX instance.
      * ---
      * 建立並初始化 WGFX 實例的工廠方法。
@@ -2023,10 +2065,11 @@ class WGFX {
      *
      * @group Rendering
      * @param inputSource - The image/video source to process / 要處理的影像來源
+     * @param options - Optional parameters including target output dimensions / 選用參數，包含目標輸出尺寸
      * @returns A promise that resolves to the output {@link GPUTexture}
      * @throws {Error} 當輸入來源維度與初始化不符時拋出錯誤
      */
-    async process(inputSource) {
+    async process(inputSource, options = {}) {
         if (!this.initialized) {
             const error = 'Instance not initialized';
             Logger.error(error);
@@ -2057,7 +2100,7 @@ class WGFX {
             throw new Error(error);
         }
         try {
-            this.runtime.resourceManager.updateTextureFromImage('INPUT', inputSource);
+            this.runtime.resourceManager.updateTextureFromImage('INPUT', inputSource, options.outWidth, options.outHeight);
             const commandEncoder = this.runtime.device.createCommandEncoder({
                 label: 'WGFX Frame Processing'
             });
@@ -2108,5 +2151,5 @@ class WGFX {
     }
 }
 
-export {LogLevel, Logger, PipelineManager, ResourceManager, WGFX, WGFXRuntime, WGSLCodeGenerator};
+export { LogLevel, Logger, PipelineManager, ResourceManager, WGFX, WGFXRuntime, WGSLCodeGenerator };
 //# sourceMappingURL=wgfx.browser.esm.js.map

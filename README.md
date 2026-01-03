@@ -15,9 +15,19 @@ This is a browser extension designed to apply real-time shaders and effects to o
 
 ## Key Modules Explanation
 
-### `wgfx.browser.esm.js` - WGFX Engine
-
 This is the core engine responsible for interpreting shader files (`.wgsl`) and managing WebGPU resources. It contains a PEG.js-based parser that reads the special comment-based header at the top of a shader file to understand its properties, parameters, and rendering passes. This allows the extension to dynamically build a UI and execute complex rendering pipelines with high performance.
+
+#### API Usage
+
+```ts
+const wgfx = await WGFX.create({ device, effectCode, width, height });
+
+// Process with default dimensions (input size)
+const output = await wgfx.process(video);
+
+// Process with dynamic output resizing (upscaling)
+const output4k = await wgfx.process(video, { outWidth: 3840, outHeight: 2160 });
+```
 
 #### How It Works
 

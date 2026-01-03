@@ -4,7 +4,9 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
     if (request.command === 'getShaderFiles') {
         const knownShaders = [
             "effects_wgsl/Anime4K/Anime4K_Denoise_Bilateral_Median.wgsl",
-            "effects_wgsl/Anime4K/Anime4K_Restore_Soft_UL.wgsl"
+            "effects_wgsl/Anime4K/Anime4K_Restore_Soft_UL.wgsl",
+            "effects_wgsl/Anime4K/Anime4K_Denoise_Bilateral_Mode.wgsl",
+            "effects_wgsl/Anime4K/Anime4K_Upscale_Denoise_S.wgsl",
             // "Sharpen/CAS.wgsl"
         ];
 

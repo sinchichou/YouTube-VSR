@@ -128,8 +128,8 @@
         render(sourceTexture) {
             const encoder = this.device.createCommandEncoder();
             encoder.copyTextureToTexture(
-                {texture: sourceTexture},
-                {texture: this.context.getCurrentTexture()},
+                { texture: sourceTexture },
+                { texture: this.context.getCurrentTexture() },
                 [sourceTexture.width, sourceTexture.height]
             );
             this.device.queue.submit([encoder.finish()]);
@@ -164,8 +164,8 @@
             this.wgfx.updateUniforms(params);
         }
 
-        async process(input) {
-            return await this.wgfx.process(input);
+        async process(input, options = {}) {
+            return await this.wgfx.process(input, options);
         }
 
         dispose() {
@@ -201,9 +201,10 @@
                 const config = await chrome.storage.local.get(['pipeline', 'debugVSR', 'debugWGFX']);
 
                 // --- 日誌切換處 ---
-                VSRLogger.setDebug(!!config.debugVSR);
-                if (WGFXClass.setDebug) {
-                    WGFXClass.setDebug(!!config.debugWGFX);
+                if (WGFXClass.setLevel) {
+                    // 例如從 config 讀取特定的 LogLevel (0: DEBUG, 1: INFO, ...)
+                    const level = config.debugWGFX ? 0 : 1;
+                    WGFXClass.setLevel(level);
                 }
                 VSRLogger.debug("日誌系統已更新: VSR=", !!config.debugVSR, "WGFX=", !!config.debugWGFX);
 
@@ -307,7 +308,7 @@
 
         _setupObservers() {
             this.resizeObserver = new ResizeObserver(() => {
-                const {videoWidth: w, videoHeight: h} = this.video;
+                const { videoWidth: w, videoHeight: h } = this.video;
                 if (w !== this.renderer.canvas.width || h !== this.renderer.canvas.height) {
                     VSRLogger.info(`解析度變更: ${w}x${h}，重新編譯...`);
                     this.stop().then(() => this.start());
@@ -326,9 +327,9 @@
         if (msg.command === 'setEnable') {
             msg.isEnabled ? vsr.start() : vsr.stop();
         } else if (msg.command === 'updateParameter') {
-            vsr.processor?.wgfx?.updateUniforms({[msg.paramName]: msg.value});
+            vsr.processor?.wgfx?.updateUniforms({ [msg.paramName]: msg.value });
         }
-        sendResponse({status: 'received'});
+        sendResponse({ status: 'received' });
         return true;
     });
 
