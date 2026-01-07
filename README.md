@@ -113,7 +113,7 @@ This directory is intended for shaders written in WGSL (WebGPU Shading Language)
 
 ## 關鍵模組說明
 
-### `wgfx.browser.esm.js` - WGFX 引擎
+### WGFX 引擎
 
 這是本專案的核心引擎，負責解讀著色器檔案（`.wgsl`）並管理 WebGPU 資源。它包含一個基於 PEG.js 的解析器，會讀取位於著色器檔案頂部的特殊註解標頭，以理解其屬性、參數和渲染通道。這使得擴充功能能夠動態建立 UI，並以高效能執行複雜的渲染管線。
 
@@ -185,3 +185,13 @@ This directory is intended for shaders written in WGSL (WebGPU Shading Language)
 ### `effects_wgsl/` 目錄
 
 此目錄用於存放以 WGSL（WebGPU Shading Language）編寫的著色器。它代表了專案中實驗性或為未來做準備的部分，使其能夠利用更新的 WebGPU API 以獲得潛在的更佳效能。
+
+### 展示
+
+#### 啟用後
+
+![VSR_on](VSR_on.png)
+
+#### 禁用後
+
+![VSR_off](VSR_off.png)

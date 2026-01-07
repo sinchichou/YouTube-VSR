@@ -49,7 +49,7 @@ struct SceneInfo {
     scale: MF2,
 }
 
-@group(0) @binding(4) var<uniform> scene: SceneInfo;
+@group(0) @binding(3) var<uniform> scene: SceneInfo;
 
 fn GetInputSize() -> uint2 {
     return scene.inputSize;
@@ -216,7 +216,7 @@ fn A4KS4(pos: MF2) -> MF4 {
 
 //!SAMPLER
 //!FILTER POINT
-@group(0) @binding(3) var sam: sampler;
+@group(0) @binding(4) var sam: sampler;
 
 //!SAMPLER
 //!FILTER LINEAR
