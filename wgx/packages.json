@@ -1,0 +1,2996 @@
+{
+  "version": 1,
+  "generatedAt": "2026-11-10T21:05:54.234Z",
+  "wgfxVersion": "1.0.0",
+  "bundleHash": "f20f4affb88c680b36e15497fe437e8766078a0711a90b4fb9f6633a99eff9e6",
+  "packagesSource": {
+    "label": "WGFX dist/wgx",
+    "dir": "D:\\WGFX\\dist\\wgx"
+  },
+  "staleBundles": false,
+  "counts": {
+    "packages": 127,
+    "legacy": 20,
+    "families": 16
+  },
+  "families": {
+    "Anime4K": 27,
+    "CAS": 2,
+    "CuNNy": 20,
+    "CuNNy2": 9,
+    "Filters": 2,
+    "FSR": 2,
+    "FSRCNNX": 2,
+    "FXAA": 3,
+    "NIS": 2,
+    "NNEDI3": 10,
+    "OpenNR": 2,
+    "RAVU": 26,
+    "Scalers": 6,
+    "Sharpen": 4,
+    "SMAA": 4,
+    "xBRZ": 6
+  },
+  "packages": [
+    {
+      "kind": "wgx",
+      "path": "wgx/Anime4K/Anime4K_3D_AA_Upscale_US.wgx",
+      "id": "Anime4K-Anime4K_3D_AA_Upscale_US",
+      "name": "Anime4K_3D_AA_Upscale_US",
+      "family": "Anime4K",
+      "description": "Conv-4x3x3x3",
+      "source": "Anime4K/Anime4K_3D_AA_Upscale_US.wgsl",
+      "tags": [
+        "Anime4K"
+      ],
+      "passCount": 3,
+      "parameters": [],
+      "manifestVersion": 1,
+      "hash": "362d551d25cb7953fa28f9f62ea6e8a4d76fda9a4df8e17be34541a04f406360",
+      "bytes": 8773,
+      "builtAt": "2026-11-10T20:50:04.485Z"
+    },
+    {
+      "kind": "wgx",
+      "path": "wgx/Anime4K/Anime4K_3D_Upscale_US.wgx",
+      "id": "Anime4K-Anime4K_3D_Upscale_US",
+      "name": "Anime4K_3D_Upscale_US",
+      "family": "Anime4K",
+      "description": "Conv-4x3x3x3",
+      "source": "Anime4K/Anime4K_3D_Upscale_US.wgsl",
+      "tags": [
+        "Anime4K"
+      ],
+      "passCount": 3,
+      "parameters": [],
+      "manifestVersion": 1,
+      "hash": "9ffe448366c1a1f2249a7b6c83df41d3b008dd0f1950a9ed58665e64908e5c41",
+      "bytes": 8758,
+      "builtAt": "2026-11-10T20:50:04.492Z"
+    },
+    {
+      "kind": "wgx",
+      "path": "wgx/Anime4K/Anime4K_Denoise_Bilateral_Mean.wgx",
+      "id": "Anime4K-Anime4K_Denoise_Bilateral_Mean",
+      "name": "Anime4K_Denoise_Bilateral_Mean",
+      "family": "Anime4K",
+      "description": "",
+      "source": "Anime4K/Anime4K_Denoise_Bilateral_Mean.wgsl",
+      "tags": [
+        "Anime4K"
+      ],
+      "passCount": 1,
+      "parameters": [
+        {
+          "name": "intensitySigma",
+          "type": "float",
+          "label": "Strength",
+          "default": 0.1,
+          "min": 0.01,
+          "max": 5,
+          "step": 0.01
+        }
+      ],
+      "manifestVersion": 1,
+      "hash": "e73c423c67e4cf0f2fa40dee16693e8249fbe9a26c278473944edb2da65bf982",
+      "bytes": 3276,
+      "builtAt": "2026-11-10T20:50:04.497Z"
+    },
+    {
+      "kind": "wgx",
+      "path": "wgx/Anime4K/Anime4K_Denoise_Bilateral_Median.wgx",
+      "id": "Anime4K-Anime4K_Denoise_Bilateral_Median",
+      "name": "Anime4K_Denoise_Bilateral_Median",
+      "family": "Anime4K",
+      "description": "",
+      "source": "Anime4K/Anime4K_Denoise_Bilateral_Median.wgsl",
+      "tags": [
+        "Anime4K"
+      ],
+      "passCount": 1,
+      "parameters": [
+        {
+          "name": "intensitySigma",
+          "type": "float",
+          "label": "Strength",
+          "default": 0.1,
+          "min": 0.01,
+          "max": 5,
+          "step": 0.01
+        }
+      ],
+      "manifestVersion": 1,
+      "hash": "8cac89ac1fd23e68c7db0650dc02d377ef7911f863e493bb2d81049983af4694",
+      "bytes": 3208,
+      "builtAt": "2026-11-10T20:50:04.500Z"
+    },
+    {
+      "kind": "wgx",
+      "path": "wgx/Anime4K/Anime4K_Denoise_Bilateral_Mode.wgx",
+      "id": "Anime4K-Anime4K_Denoise_Bilateral_Mode",
+      "name": "Anime4K_Denoise_Bilateral_Mode",
+      "family": "Anime4K",
+      "description": "",
+      "source": "Anime4K/Anime4K_Denoise_Bilateral_Mode.wgsl",
+      "tags": [
+        "Anime4K"
+      ],
+      "passCount": 1,
+      "parameters": [
+        {
+          "name": "intensitySigma",
+          "type": "float",
+          "label": "Strength",
+          "default": 0.1,
+          "min": 0.01,
+          "max": 5,
+          "step": 0.01
+        }
+      ],
+      "manifestVersion": 1,
+      "hash": "7bb0ce39e2c7290e2260a3a9a3aae03f5ce4ecb17b45e83fdf9ba71bbc581232",
+      "bytes": 3400,
+      "builtAt": "2026-11-10T20:50:04.503Z"
+    },
+    {
+      "kind": "wgx",
+      "path": "wgx/Anime4K/Anime4K_Restore_L.wgx",
+      "id": "Anime4K-Anime4K_Restore_L",
+      "name": "Anime4K_Restore_L",
+      "family": "Anime4K",
+      "description": "Conv-4x3x3x3",
+      "source": "Anime4K/Anime4K_Restore_L.wgsl",
+      "tags": [
+        "Anime4K"
+      ],
+      "passCount": 5,
+      "parameters": [],
+      "manifestVersion": 1,
+      "hash": "c621d5011c103e60fa5676b6789aea27bdbfd20b773e9561c841912000bd6500",
+      "bytes": 31663,
+      "builtAt": "2026-11-10T20:50:04.550Z"
+    },
+    {
+      "kind": "wgx",
+      "path": "wgx/Anime4K/Anime4K_Restore_M.wgx",
+      "id": "Anime4K-Anime4K_Restore_M",
+      "name": "Anime4K_Restore_M",
+      "family": "Anime4K",
+      "description": "Conv-4x3x3x3",
+      "source": "Anime4K/Anime4K_Restore_M.wgsl",
+      "tags": [
+        "Anime4K"
+      ],
+      "passCount": 7,
+      "parameters": [],
+      "manifestVersion": 1,
+      "hash": "dcc00d3d82e97ebf34bf0c57ea18808a9a1455977a0313ec501b4e5dc920d9ce",
+      "bytes": 23294,
+      "builtAt": "2026-11-10T20:50:04.558Z"
+    },
+    {
+      "kind": "wgx",
+      "path": "wgx/Anime4K/Anime4K_Restore_S.wgx",
+      "id": "Anime4K-Anime4K_Restore_S",
+      "name": "Anime4K_Restore_S",
+      "family": "Anime4K",
+      "description": "Conv-4x3x3x3",
+      "source": "Anime4K/Anime4K_Restore_S.wgsl",
+      "tags": [
+        "Anime4K"
+      ],
+      "passCount": 4,
+      "parameters": [],
+      "manifestVersion": 1,
+      "hash": "86226df4cd3bc6ccdd54ee7bc0fa77c28ce1a3f490b6af82940e06b4126a8168",
+      "bytes": 12090,
+      "builtAt": "2026-11-10T20:50:04.563Z"
+    },
+    {
+      "kind": "wgx",
+      "path": "wgx/Anime4K/Anime4K_Restore_Soft_L.wgx",
+      "id": "Anime4K-Anime4K_Restore_Soft_L",
+      "name": "Anime4K_Restore_Soft_L",
+      "family": "Anime4K",
+      "description": "Conv-4x3x3x3",
+      "source": "Anime4K/Anime4K_Restore_Soft_L.wgsl",
+      "tags": [
+        "Anime4K"
+      ],
+      "passCount": 5,
+      "parameters": [],
+      "manifestVersion": 1,
+      "hash": "9bf5046c2c6625aba8a6664ea2b182c96e07ba4c88c250615c72eedc75437100",
+      "bytes": 31764,
+      "builtAt": "2026-11-10T20:50:04.575Z"
+    },
+    {
+      "kind": "wgx",
+      "path": "wgx/Anime4K/Anime4K_Restore_Soft_M.wgx",
+      "id": "Anime4K-Anime4K_Restore_Soft_M",
+      "name": "Anime4K_Restore_Soft_M",
+      "family": "Anime4K",
+      "description": "Conv-4x3x3x3",
+      "source": "Anime4K/Anime4K_Restore_Soft_M.wgsl",
+      "tags": [
+        "Anime4K"
+      ],
+      "passCount": 7,
+      "parameters": [],
+      "manifestVersion": 1,
+      "hash": "37c0a7e50bac9f9b5bd4726508aba3499bd710dedef7fe304450019deb112c96",
+      "bytes": 23297,
+      "builtAt": "2026-11-10T20:50:04.582Z"
+    },
+    {
+      "kind": "wgx",
+      "path": "wgx/Anime4K/Anime4K_Restore_Soft_S.wgx",
+      "id": "Anime4K-Anime4K_Restore_Soft_S",
+      "name": "Anime4K_Restore_Soft_S",
+      "family": "Anime4K",
+      "description": "Conv-4x3x3x3",
+      "source": "Anime4K/Anime4K_Restore_Soft_S.wgsl",
+      "tags": [
+        "Anime4K"
+      ],
+      "passCount": 4,
+      "parameters": [],
+      "manifestVersion": 1,
+      "hash": "8d6a5a605f733ad9a171a79a8a9360fb9ca3d2fb1a5cb8fc74b5a3724ab725aa",
+      "bytes": 12142,
+      "builtAt": "2026-11-10T20:50:04.587Z"
+    },
+    {
+      "kind": "wgx",
+      "path": "wgx/Anime4K/Anime4K_Restore_Soft_UL.wgx",
+      "id": "Anime4K-Anime4K_Restore_Soft_UL",
+      "name": "Anime4K_Restore_Soft_UL",
+      "family": "Anime4K",
+      "description": "Conv-4x3x3x3",
+      "source": "Anime4K/Anime4K_Restore_Soft_UL.wgsl",
+      "tags": [
+        "Anime4K"
+      ],
+      "passCount": 8,
+      "parameters": [],
+      "manifestVersion": 1,
+      "hash": "9c7140388bb3bfd205850e8d32503790b47606b15be54be8c0964fd8051df9a3",
+      "bytes": 118793,
+      "builtAt": "2026-11-10T20:50:04.630Z"
+    },
+    {
+      "kind": "wgx",
+      "path": "wgx/Anime4K/Anime4K_Restore_Soft_VL.wgx",
+      "id": "Anime4K-Anime4K_Restore_Soft_VL",
+      "name": "Anime4K_Restore_Soft_VL",
+      "family": "Anime4K",
+      "description": "Conv-4x3x3x3",
+      "source": "Anime4K/Anime4K_Restore_Soft_VL.wgsl",
+      "tags": [
+        "Anime4K"
+      ],
+      "passCount": 8,
+      "parameters": [],
+      "manifestVersion": 1,
+      "hash": "82c724a6de7fa2c6cd9ac483f282a8de3b765294f87b73441f2f4b2e3b7d1e20",
+      "bytes": 62175,
+      "builtAt": "2026-11-10T20:50:04.651Z"
+    },
+    {
+      "kind": "wgx",
+      "path": "wgx/Anime4K/Anime4K_Restore_UL.wgx",
+      "id": "Anime4K-Anime4K_Restore_UL",
+      "name": "Anime4K_Restore_UL",
+      "family": "Anime4K",
+      "description": "Conv-4x3x3x3",
+      "source": "Anime4K/Anime4K_Restore_UL.wgsl",
+      "tags": [
+        "Anime4K"
+      ],
+      "passCount": 8,
+      "parameters": [],
+      "manifestVersion": 1,
+      "hash": "0f37f85f4ca027a327433d147fd7ab0990b2e34051c5c36c53de90cd50e3ee77",
+      "bytes": 118701,
+      "builtAt": "2026-11-10T20:50:04.695Z"
+    },
+    {
+      "kind": "wgx",
+      "path": "wgx/Anime4K/Anime4K_Restore_VL.wgx",
+      "id": "Anime4K-Anime4K_Restore_VL",
+      "name": "Anime4K_Restore_VL",
+      "family": "Anime4K",
+      "description": "Conv-4x3x3x3",
+      "source": "Anime4K/Anime4K_Restore_VL.wgsl",
+      "tags": [
+        "Anime4K"
+      ],
+      "passCount": 8,
+      "parameters": [],
+      "manifestVersion": 1,
+      "hash": "f9216ad59bc82b0ea973aee8582904025dd9e1cd2a23cc70ca5cacc288e634fa",
+      "bytes": 62129,
+      "builtAt": "2026-11-10T20:50:04.717Z"
+    },
+    {
+      "kind": "wgx",
+      "path": "wgx/Anime4K/Anime4K_Thin_HQ.wgx",
+      "id": "Anime4K-Anime4K_Thin_HQ",
+      "name": "Anime4K_Thin_HQ",
+      "family": "Anime4K",
+      "description": "Sobel",
+      "source": "Anime4K/Anime4K_Thin_HQ.wgsl",
+      "tags": [
+        "Anime4K"
+      ],
+      "passCount": 5,
+      "parameters": [
+        {
+          "name": "strength",
+          "type": "float",
+          "label": "Strength",
+          "default": 0.6,
+          "min": 0.1,
+          "max": 10,
+          "step": 0.1
+        },
+        {
+          "name": "iterations",
+          "type": "int",
+          "label": "Iterations",
+          "default": 1,
+          "min": 1,
+          "max": 10,
+          "step": 1
+        }
+      ],
+      "manifestVersion": 1,
+      "hash": "14a4dfbed9aae6cd1cde9ae3421232c069a5903c3df0df0e260b726386443143",
+      "bytes": 8981,
+      "builtAt": "2026-11-10T20:50:04.721Z"
+    },
+    {
+      "kind": "wgx",
+      "path": "wgx/Anime4K/Anime4K_Upscale_Denoise_L.wgx",
+      "id": "Anime4K-Anime4K_Upscale_Denoise_L",
+      "name": "Anime4K_Upscale_Denoise_L",
+      "family": "Anime4K",
+      "description": "Conv-4x3x3x3",
+      "source": "Anime4K/Anime4K_Upscale_Denoise_L.wgsl",
+      "tags": [
+        "Anime4K"
+      ],
+      "passCount": 4,
+      "parameters": [],
+      "manifestVersion": 1,
+      "hash": "0b32704afb072ba12293e5e0480b8f45e8f317928d1712fc5619eedc83416584",
+      "bytes": 31332,
+      "builtAt": "2026-11-10T20:50:04.732Z"
+    },
+    {
+      "kind": "wgx",
+      "path": "wgx/Anime4K/Anime4K_Upscale_Denoise_S.wgx",
+      "id": "Anime4K-Anime4K_Upscale_Denoise_S",
+      "name": "Anime4K_Upscale_Denoise_S",
+      "family": "Anime4K",
+      "description": "Conv-4x3x3x3",
+      "source": "Anime4K/Anime4K_Upscale_Denoise_S.wgsl",
+      "tags": [
+        "Anime4K"
+      ],
+      "passCount": 4,
+      "parameters": [],
+      "manifestVersion": 1,
+      "hash": "0eb14ca9b923f3892777b61b186c736fba75b276a0fb2a7bb179f39fb0061225",
+      "bytes": 12725,
+      "builtAt": "2026-11-10T20:50:04.737Z"
+    },
+    {
+      "kind": "wgx",
+      "path": "wgx/Anime4K/Anime4K_Upscale_Denoise_UL.wgx",
+      "id": "Anime4K-Anime4K_Upscale_Denoise_UL",
+      "name": "Anime4K_Upscale_Denoise_UL",
+      "family": "Anime4K",
+      "description": "Conv-4x3x3x3",
+      "source": "Anime4K/Anime4K_Upscale_Denoise_UL.wgsl",
+      "tags": [
+        "Anime4K"
+      ],
+      "passCount": 8,
+      "parameters": [],
+      "manifestVersion": 1,
+      "hash": "5c32d3ce33b3a653105fda0ef4969e1c8da5063f5d39aefe6b22b0db08ee1b04",
+      "bytes": 109934,
+      "builtAt": "2026-11-10T20:50:04.780Z"
+    },
+    {
+      "kind": "wgx",
+      "path": "wgx/Anime4K/Anime4K_Upscale_Denoise_VL.wgx",
+      "id": "Anime4K-Anime4K_Upscale_Denoise_VL",
+      "name": "Anime4K_Upscale_Denoise_VL",
+      "family": "Anime4K",
+      "description": "Conv-4x3x3x3",
+      "source": "Anime4K/Anime4K_Upscale_Denoise_VL.wgsl",
+      "tags": [
+        "Anime4K"
+      ],
+      "passCount": 8,
+      "parameters": [],
+      "manifestVersion": 1,
+      "hash": "a786c466c303d62bff8e747855f4f7507d07518ca1075bc2e777d94dca5bce1b",
+      "bytes": 61803,
+      "builtAt": "2026-11-10T20:50:04.802Z"
+    },
+    {
+      "kind": "wgx",
+      "path": "wgx/Anime4K/Anime4K_Upscale_GAN_x2_M.wgx",
+      "id": "Anime4K-Anime4K_Upscale_GAN_x2_M",
+      "name": "Anime4K_Upscale_GAN_x2_M",
+      "family": "Anime4K",
+      "description": "Conv-4x3x3x3",
+      "source": "Anime4K/Anime4K_Upscale_GAN_x2_M.wgsl",
+      "tags": [
+        "Anime4K"
+      ],
+      "passCount": 7,
+      "parameters": [],
+      "manifestVersion": 1,
+      "hash": "6b06062520db9cd68eaeca58985059fe1f26490b36c899ea9a99170ae2f953f5",
+      "bytes": 59384,
+      "builtAt": "2026-11-10T20:50:04.822Z"
+    },
+    {
+      "kind": "wgx",
+      "path": "wgx/Anime4K/Anime4K_Upscale_GAN_x2_S.wgx",
+      "id": "Anime4K-Anime4K_Upscale_GAN_x2_S",
+      "name": "Anime4K_Upscale_GAN_x2_S",
+      "family": "Anime4K",
+      "description": "Conv-4x3x3x3",
+      "source": "Anime4K/Anime4K_Upscale_GAN_x2_S.wgsl",
+      "tags": [
+        "Anime4K"
+      ],
+      "passCount": 7,
+      "parameters": [],
+      "manifestVersion": 1,
+      "hash": "3e89ee2475a5daed9804ea8991db29415f2beb2731883823269b4a572b004798",
+      "bytes": 35764,
+      "builtAt": "2026-11-10T20:50:04.834Z"
+    },
+    {
+      "kind": "wgx",
+      "path": "wgx/Anime4K/Anime4K_Upscale_GAN_x3_L.wgx",
+      "id": "Anime4K-Anime4K_Upscale_GAN_x3_L",
+      "name": "Anime4K_Upscale_GAN_x3_L",
+      "family": "Anime4K",
+      "description": "Conv-4x3x3x3",
+      "source": "Anime4K/Anime4K_Upscale_GAN_x3_L.wgsl",
+      "tags": [
+        "Anime4K"
+      ],
+      "passCount": 9,
+      "parameters": [],
+      "manifestVersion": 1,
+      "hash": "c268114100cfec41f7b344a90418bb8e361c7c2a5381a2aa9e584d80a744a193",
+      "bytes": 92886,
+      "builtAt": "2026-11-10T20:50:04.867Z"
+    },
+    {
+      "kind": "wgx",
+      "path": "wgx/Anime4K/Anime4K_Upscale_L.wgx",
+      "id": "Anime4K-Anime4K_Upscale_L",
+      "name": "Anime4K_Upscale_L",
+      "family": "Anime4K",
+      "description": "Conv-4x3x3x3",
+      "source": "Anime4K/Anime4K_Upscale_L.wgsl",
+      "tags": [
+        "Anime4K"
+      ],
+      "passCount": 4,
+      "parameters": [],
+      "manifestVersion": 1,
+      "hash": "37ae8b2e5a1922378b8fc925058f4f9a035df4050d29ba675bd36accad286ece",
+      "bytes": 31305,
+      "builtAt": "2026-11-10T20:50:04.876Z"
+    },
+    {
+      "kind": "wgx",
+      "path": "wgx/Anime4K/Anime4K_Upscale_S.wgx",
+      "id": "Anime4K-Anime4K_Upscale_S",
+      "name": "Anime4K_Upscale_S",
+      "family": "Anime4K",
+      "description": "Conv-4x3x3x3",
+      "source": "Anime4K/Anime4K_Upscale_S.wgsl",
+      "tags": [
+        "Anime4K"
+      ],
+      "passCount": 4,
+      "parameters": [],
+      "manifestVersion": 1,
+      "hash": "06fd9ddc753537f71df190e893159e7595061e8d6c9b8e4de7411ddf38f63d8a",
+      "bytes": 12744,
+      "builtAt": "2026-11-10T20:50:04.881Z"
+    },
+    {
+      "kind": "wgx",
+      "path": "wgx/Anime4K/Anime4K_Upscale_UL.wgx",
+      "id": "Anime4K-Anime4K_Upscale_UL",
+      "name": "Anime4K_Upscale_UL",
+      "family": "Anime4K",
+      "description": "Conv-4x3x3x3",
+      "source": "Anime4K/Anime4K_Upscale_UL.wgsl",
+      "tags": [
+        "Anime4K"
+      ],
+      "passCount": 8,
+      "parameters": [],
+      "manifestVersion": 1,
+      "hash": "0f3e48f04e66e4724b080a1ebac5a2e61df20df0781de67b5bca4abeff377c8a",
+      "bytes": 109853,
+      "builtAt": "2026-11-10T20:50:04.919Z"
+    },
+    {
+      "kind": "wgx",
+      "path": "wgx/Anime4K/Anime4K_Upscale_VL.wgx",
+      "id": "Anime4K-Anime4K_Upscale_VL",
+      "name": "Anime4K_Upscale_VL",
+      "family": "Anime4K",
+      "description": "Conv-4x3x3x3",
+      "source": "Anime4K/Anime4K_Upscale_VL.wgsl",
+      "tags": [
+        "Anime4K"
+      ],
+      "passCount": 8,
+      "parameters": [],
+      "manifestVersion": 1,
+      "hash": "22a3690b0951179e934e359b0e293631e8dd0bcd54a67c9e03e6e0976a79b2e1",
+      "bytes": 61775,
+      "builtAt": "2026-11-10T20:50:04.937Z"
+    },
+    {
+      "kind": "wgx",
+      "path": "wgx/CAS/CAS.wgx",
+      "id": "CAS-CAS",
+      "name": "CAS",
+      "family": "CAS",
+      "description": "AMD FidelityFX CAS — contrast adaptive sharpening (1:1)",
+      "source": "CAS/CAS.wgsl",
+      "tags": [
+        "CAS"
+      ],
+      "passCount": 1,
+      "parameters": [
+        {
+          "name": "sharpness",
+          "type": "float",
+          "label": "Sharpness",
+          "default": 0.4,
+          "min": 0,
+          "max": 1,
+          "step": 0.01
+        }
+      ],
+      "manifestVersion": 1,
+      "hash": "2e59840c436f1950c1e69afe1a64163dfb3dc799b8a6d0114985be846c1c178d",
+      "bytes": 2986,
+      "builtAt": "2026-11-10T20:50:04.939Z"
+    },
+    {
+      "kind": "wgx",
+      "path": "wgx/CAS/CAS_Scaling.wgx",
+      "id": "CAS-CAS_Scaling",
+      "name": "CAS_Scaling",
+      "family": "CAS",
+      "description": "AMD FidelityFX CAS — contrast adaptive sharpening with scaling",
+      "source": "CAS/CAS_Scaling.wgsl",
+      "tags": [
+        "CAS"
+      ],
+      "passCount": 1,
+      "parameters": [
+        {
+          "name": "sharpness",
+          "type": "float",
+          "label": "Sharpness",
+          "default": 0.4,
+          "min": 0,
+          "max": 1,
+          "step": 0.01
+        }
+      ],
+      "manifestVersion": 1,
+      "hash": "342ad6c98b9aaecb2752793425e920e5b582df3fd6eea33d5d33267286dd7412",
+      "bytes": 3965,
+      "builtAt": "2026-11-10T20:50:04.942Z"
+    },
+    {
+      "kind": "wgx",
+      "path": "wgx/CuNNy/CuNNy-2x4C-NVL.wgx",
+      "id": "CuNNy-CuNNy-2x4C-NVL",
+      "name": "CuNNy-D04N02",
+      "family": "CuNNy",
+      "description": "in",
+      "source": "CuNNy/CuNNy-2x4C-NVL.wgsl",
+      "tags": [
+        "CuNNy"
+      ],
+      "passCount": 4,
+      "parameters": [],
+      "manifestVersion": 1,
+      "hash": "d269a22fa2b1b1b8c142c77b8b54ab43c68cdbd1016ce726a9e9c5a8a0c094a4",
+      "bytes": 10446,
+      "builtAt": "2026-11-10T20:50:06.457Z"
+    },
+    {
+      "kind": "wgx",
+      "path": "wgx/CuNNy/CuNNy-3x4C-NVL.wgx",
+      "id": "CuNNy-CuNNy-3x4C-NVL",
+      "name": "CuNNy-D04N03",
+      "family": "CuNNy",
+      "description": "in",
+      "source": "CuNNy/CuNNy-3x4C-NVL.wgsl",
+      "tags": [
+        "CuNNy"
+      ],
+      "passCount": 5,
+      "parameters": [],
+      "manifestVersion": 1,
+      "hash": "30183359831851a88f77c1d0e4f17095382331bdb64669faa2511e4d9ecab987",
+      "bytes": 12940,
+      "builtAt": "2026-11-10T20:50:06.466Z"
+    },
+    {
+      "kind": "wgx",
+      "path": "wgx/CuNNy/CuNNy-4x4C-NVL.wgx",
+      "id": "CuNNy-CuNNy-4x4C-NVL",
+      "name": "CuNNy-D04N04",
+      "family": "CuNNy",
+      "description": "in",
+      "source": "CuNNy/CuNNy-4x4C-NVL.wgsl",
+      "tags": [
+        "CuNNy"
+      ],
+      "passCount": 6,
+      "parameters": [],
+      "manifestVersion": 1,
+      "hash": "3f603115fb63d34f4924d10bd9042890654bcd067c052e6d7f92884bd248a559",
+      "bytes": 15507,
+      "builtAt": "2026-11-10T20:50:06.594Z"
+    },
+    {
+      "kind": "wgx",
+      "path": "wgx/CuNNy/CuNNy-8x4C-NVL.wgx",
+      "id": "CuNNy-CuNNy-8x4C-NVL",
+      "name": "CuNNy-D04N08",
+      "family": "CuNNy",
+      "description": "in",
+      "source": "CuNNy/CuNNy-8x4C-NVL.wgsl",
+      "tags": [
+        "CuNNy"
+      ],
+      "passCount": 10,
+      "parameters": [],
+      "manifestVersion": 1,
+      "hash": "4d1e110e5c5a39e71606772bac637ede8eae00da5b42fcfa8aa409fa2f195587",
+      "bytes": 25666,
+      "builtAt": "2026-11-10T20:50:06.896Z"
+    },
+    {
+      "kind": "wgx",
+      "path": "wgx/CuNNy/CuNNy-4x8C-NVL.wgx",
+      "id": "CuNNy-CuNNy-4x8C-NVL",
+      "name": "CuNNy-D08N04",
+      "family": "CuNNy",
+      "description": "in",
+      "source": "CuNNy/CuNNy-4x8C-NVL.wgsl",
+      "tags": [
+        "CuNNy"
+      ],
+      "passCount": 6,
+      "parameters": [],
+      "manifestVersion": 1,
+      "hash": "81458c074263aae4b882a47bec47d512e7b7018800d875b41131c1543dafe88d",
+      "bytes": 31131,
+      "builtAt": "2026-11-10T20:50:06.621Z"
+    },
+    {
+      "kind": "wgx",
+      "path": "wgx/CuNNy/CuNNy-6x8C-NVL.wgx",
+      "id": "CuNNy-CuNNy-6x8C-NVL",
+      "name": "CuNNy-D08N06",
+      "family": "CuNNy",
+      "description": "in",
+      "source": "CuNNy/CuNNy-6x8C-NVL.wgsl",
+      "tags": [
+        "CuNNy"
+      ],
+      "passCount": 8,
+      "parameters": [],
+      "manifestVersion": 1,
+      "hash": "fb5c5ad70dc73b3de575fa4eb4c3a47238b327951d39567a183081281970d60a",
+      "bytes": 43211,
+      "builtAt": "2026-11-10T20:50:06.656Z"
+    },
+    {
+      "kind": "wgx",
+      "path": "wgx/CuNNy/CuNNy-8x8C-NVL.wgx",
+      "id": "CuNNy-CuNNy-8x8C-NVL",
+      "name": "CuNNy-D08N08",
+      "family": "CuNNy",
+      "description": "in",
+      "source": "CuNNy/CuNNy-8x8C-NVL.wgsl",
+      "tags": [
+        "CuNNy"
+      ],
+      "passCount": 10,
+      "parameters": [],
+      "manifestVersion": 1,
+      "hash": "384694d638efdb5f9b1df6cbf8d06dae1ab146ff743678be0acf020a3149588f",
+      "bytes": 55298,
+      "builtAt": "2026-11-10T20:50:06.941Z"
+    },
+    {
+      "kind": "wgx",
+      "path": "wgx/CuNNy/CuNNy-4x16C-NVL.wgx",
+      "id": "CuNNy-CuNNy-4x16C-NVL",
+      "name": "CuNNy-D16N04",
+      "family": "CuNNy",
+      "description": "in",
+      "source": "CuNNy/CuNNy-4x16C-NVL.wgsl",
+      "tags": [
+        "CuNNy"
+      ],
+      "passCount": 6,
+      "parameters": [],
+      "manifestVersion": 1,
+      "hash": "5d81e6cbb0b83a166c12e604a007f81e56e88df7d3ce231a9d38071371440997",
+      "bytes": 83930,
+      "builtAt": "2026-11-10T20:50:06.583Z"
+    },
+    {
+      "kind": "wgx",
+      "path": "wgx/CuNNy/CuNNy-8x16C-NVL.wgx",
+      "id": "CuNNy-CuNNy-8x16C-NVL",
+      "name": "CuNNy-D16N08",
+      "family": "CuNNy",
+      "description": "in",
+      "source": "CuNNy/CuNNy-8x16C-NVL.wgsl",
+      "tags": [
+        "CuNNy"
+      ],
+      "passCount": 10,
+      "parameters": [],
+      "manifestVersion": 1,
+      "hash": "4b00f2a49729fa8138086253a5582b66a74fe7f149d209a9bddfeedf8db17976",
+      "bytes": 157839,
+      "builtAt": "2026-11-10T20:50:06.877Z"
+    },
+    {
+      "kind": "wgx",
+      "path": "wgx/CuNNy/CuNNy-16x16C-NVL.wgx",
+      "id": "CuNNy-CuNNy-16x16C-NVL",
+      "name": "CuNNy-D16N16",
+      "family": "CuNNy",
+      "description": "in",
+      "source": "CuNNy/CuNNy-16x16C-NVL.wgsl",
+      "tags": [
+        "CuNNy"
+      ],
+      "passCount": 18,
+      "parameters": [],
+      "manifestVersion": 1,
+      "hash": "8b0736fbb38631c61227da0846a6fa022b9a0dae3cad335333f732f1121f2bdc",
+      "bytes": 304810,
+      "builtAt": "2026-11-10T20:50:06.447Z"
+    },
+    {
+      "kind": "wgx",
+      "path": "wgx/CuNNy/CuNNy-2x4C-NVL-DN.wgx",
+      "id": "CuNNy-CuNNy-2x4C-NVL-DN",
+      "name": "CuNNy-DN-D04N02",
+      "family": "CuNNy",
+      "description": "in",
+      "source": "CuNNy/CuNNy-2x4C-NVL-DN.wgsl",
+      "tags": [
+        "CuNNy"
+      ],
+      "passCount": 4,
+      "parameters": [],
+      "manifestVersion": 1,
+      "hash": "a0dbb7148394fa1a12c1534fa55adcd463eea575319b221f916eac2bae22d9ac",
+      "bytes": 10426,
+      "builtAt": "2026-11-10T20:50:06.453Z"
+    },
+    {
+      "kind": "wgx",
+      "path": "wgx/CuNNy/CuNNy-3x4C-NVL-DN.wgx",
+      "id": "CuNNy-CuNNy-3x4C-NVL-DN",
+      "name": "CuNNy-DN-D04N03",
+      "family": "CuNNy",
+      "description": "in",
+      "source": "CuNNy/CuNNy-3x4C-NVL-DN.wgsl",
+      "tags": [
+        "CuNNy"
+      ],
+      "passCount": 5,
+      "parameters": [],
+      "manifestVersion": 1,
+      "hash": "5e79e2ff78fc507a3c677be7990e45000859c9f28c4f987a3a44dc657573f2e0",
+      "bytes": 12936,
+      "builtAt": "2026-11-10T20:50:06.462Z"
+    },
+    {
+      "kind": "wgx",
+      "path": "wgx/CuNNy/CuNNy-4x4C-NVL-DN.wgx",
+      "id": "CuNNy-CuNNy-4x4C-NVL-DN",
+      "name": "CuNNy-DN-D04N04",
+      "family": "CuNNy",
+      "description": "in",
+      "source": "CuNNy/CuNNy-4x4C-NVL-DN.wgsl",
+      "tags": [
+        "CuNNy"
+      ],
+      "passCount": 6,
+      "parameters": [],
+      "manifestVersion": 1,
+      "hash": "bdb0de227e45e92ca3507129561a5852618e32902aa0ff283044a5913c3d79b8",
+      "bytes": 15485,
+      "builtAt": "2026-11-10T20:50:06.589Z"
+    },
+    {
+      "kind": "wgx",
+      "path": "wgx/CuNNy/CuNNy-8x4C-NVL-DN.wgx",
+      "id": "CuNNy-CuNNy-8x4C-NVL-DN",
+      "name": "CuNNy-DN-D04N08",
+      "family": "CuNNy",
+      "description": "in",
+      "source": "CuNNy/CuNNy-8x4C-NVL-DN.wgsl",
+      "tags": [
+        "CuNNy"
+      ],
+      "passCount": 10,
+      "parameters": [],
+      "manifestVersion": 1,
+      "hash": "392fabce104b66a738ae07de9729f2da5331cf9286ce00fe19b5ab82996176a4",
+      "bytes": 25637,
+      "builtAt": "2026-11-10T20:50:06.887Z"
+    },
+    {
+      "kind": "wgx",
+      "path": "wgx/CuNNy/CuNNy-4x8C-NVL-DN.wgx",
+      "id": "CuNNy-CuNNy-4x8C-NVL-DN",
+      "name": "CuNNy-DN-D08N04",
+      "family": "CuNNy",
+      "description": "in",
+      "source": "CuNNy/CuNNy-4x8C-NVL-DN.wgsl",
+      "tags": [
+        "CuNNy"
+      ],
+      "passCount": 6,
+      "parameters": [],
+      "manifestVersion": 1,
+      "hash": "53d2c1a2301b8f426d45f27ee73b77a2753d3683f3e664d44a928a9d0611a36c",
+      "bytes": 31124,
+      "builtAt": "2026-11-10T20:50:06.606Z"
+    },
+    {
+      "kind": "wgx",
+      "path": "wgx/CuNNy/CuNNy-6x8C-NVL-DN.wgx",
+      "id": "CuNNy-CuNNy-6x8C-NVL-DN",
+      "name": "CuNNy-DN-D08N06",
+      "family": "CuNNy",
+      "description": "in",
+      "source": "CuNNy/CuNNy-6x8C-NVL-DN.wgsl",
+      "tags": [
+        "CuNNy"
+      ],
+      "passCount": 8,
+      "parameters": [],
+      "manifestVersion": 1,
+      "hash": "1d226697f318e303c0887fdd8a2a8de6dbd1a673bad747b14e49450b9e32b727",
+      "bytes": 43035,
+      "builtAt": "2026-11-10T20:50:06.638Z"
+    },
+    {
+      "kind": "wgx",
+      "path": "wgx/CuNNy/CuNNy-8x8C-NVL-DN.wgx",
+      "id": "CuNNy-CuNNy-8x8C-NVL-DN",
+      "name": "CuNNy-DN-D08N08",
+      "family": "CuNNy",
+      "description": "in",
+      "source": "CuNNy/CuNNy-8x8C-NVL-DN.wgsl",
+      "tags": [
+        "CuNNy"
+      ],
+      "passCount": 10,
+      "parameters": [],
+      "manifestVersion": 1,
+      "hash": "fcbb7cfadad1e8788fda0f23b37403d1da6f3660e477e3abac32d152a2b9b9e7",
+      "bytes": 55099,
+      "builtAt": "2026-11-10T20:50:06.918Z"
+    },
+    {
+      "kind": "wgx",
+      "path": "wgx/CuNNy/CuNNy-4x16C-NVL-DN.wgx",
+      "id": "CuNNy-CuNNy-4x16C-NVL-DN",
+      "name": "CuNNy-DN-D16N04",
+      "family": "CuNNy",
+      "description": "in",
+      "source": "CuNNy/CuNNy-4x16C-NVL-DN.wgsl",
+      "tags": [
+        "CuNNy"
+      ],
+      "passCount": 6,
+      "parameters": [],
+      "manifestVersion": 1,
+      "hash": "502358bdc1e3c0971338c637a86d3487a2be4b3555e017dfe9ee8f635c1cf3bb",
+      "bytes": 83913,
+      "builtAt": "2026-11-10T20:50:06.526Z"
+    },
+    {
+      "kind": "wgx",
+      "path": "wgx/CuNNy/CuNNy-8x16C-NVL-DN.wgx",
+      "id": "CuNNy-CuNNy-8x16C-NVL-DN",
+      "name": "CuNNy-DN-D16N08",
+      "family": "CuNNy",
+      "description": "in",
+      "source": "CuNNy/CuNNy-8x16C-NVL-DN.wgsl",
+      "tags": [
+        "CuNNy"
+      ],
+      "passCount": 10,
+      "parameters": [],
+      "manifestVersion": 1,
+      "hash": "5c7f94998ecda70691e6e826db671b5e28dc3902d00a08d380a99419495c1b68",
+      "bytes": 157437,
+      "builtAt": "2026-11-10T20:50:06.767Z"
+    },
+    {
+      "kind": "wgx",
+      "path": "wgx/CuNNy/CuNNy-16x16C-NVL-DN.wgx",
+      "id": "CuNNy-CuNNy-16x16C-NVL-DN",
+      "name": "CuNNy-DN-D16N16",
+      "family": "CuNNy",
+      "description": "in",
+      "source": "CuNNy/CuNNy-16x16C-NVL-DN.wgsl",
+      "tags": [
+        "CuNNy"
+      ],
+      "passCount": 18,
+      "parameters": [],
+      "manifestVersion": 1,
+      "hash": "85ac4c6a4e9ba317a4734b04f468d184d7df37ca9c9e92767ed4f66f2138ed36",
+      "bytes": 304736,
+      "builtAt": "2026-11-10T20:50:06.227Z"
+    },
+    {
+      "kind": "wgx",
+      "path": "wgx/CuNNy2/CuNNy-veryfast-NVL.wgx",
+      "id": "CuNNy2-CuNNy-veryfast-NVL",
+      "name": "CuNNy-0001",
+      "family": "CuNNy2",
+      "description": "in (1x8)",
+      "source": "CuNNy2/CuNNy-veryfast-NVL.wgsl",
+      "tags": [
+        "CuNNy2"
+      ],
+      "passCount": 4,
+      "parameters": [],
+      "manifestVersion": 1,
+      "hash": "85df987e50a168bbc9c90bb2a2ef6745889919070e197a413a23814fac15237d",
+      "bytes": 10915,
+      "builtAt": "2026-11-10T20:50:06.012Z"
+    },
+    {
+      "kind": "wgx",
+      "path": "wgx/CuNNy2/CuNNy-faster-NVL.wgx",
+      "id": "CuNNy2-CuNNy-faster-NVL",
+      "name": "CuNNy-0002",
+      "family": "CuNNy2",
+      "description": "in (1x8)",
+      "source": "CuNNy2/CuNNy-faster-NVL.wgsl",
+      "tags": [
+        "CuNNy2"
+      ],
+      "passCount": 4,
+      "parameters": [],
+      "manifestVersion": 1,
+      "hash": "b70adb35f4f1c49bc28ae97a641af1ffaf6f49da443859486b3d9adcf7c5621f",
+      "bytes": 12687,
+      "builtAt": "2026-11-10T20:50:06.008Z"
+    },
+    {
+      "kind": "wgx",
+      "path": "wgx/CuNNy2/CuNNy-fast-NVL.wgx",
+      "id": "CuNNy2-CuNNy-fast-NVL",
+      "name": "CuNNy-0003",
+      "family": "CuNNy2",
+      "description": "in (1x12)",
+      "source": "CuNNy2/CuNNy-fast-NVL.wgsl",
+      "tags": [
+        "CuNNy2"
+      ],
+      "passCount": 4,
+      "parameters": [],
+      "manifestVersion": 1,
+      "hash": "ed7d092d5c38cf54db699ed8b0b7c6a1efa5237cd7ec8863f0ce9044aac84065",
+      "bytes": 16807,
+      "builtAt": "2026-11-10T20:50:06.002Z"
+    },
+    {
+      "kind": "wgx",
+      "path": "wgx/CuNNy2/CuNNy-3x12-NVL.wgx",
+      "id": "CuNNy2-CuNNy-3x12-NVL",
+      "name": "CuNNy-03x12",
+      "family": "CuNNy2",
+      "description": "in (3x12)",
+      "source": "CuNNy2/CuNNy-3x12-NVL.wgsl",
+      "tags": [
+        "CuNNy2"
+      ],
+      "passCount": 5,
+      "parameters": [],
+      "manifestVersion": 1,
+      "hash": "fba33ade33db9920f137da1e5d925bff054b1644e491c505bb49d60d0e580226",
+      "bytes": 29268,
+      "builtAt": "2026-11-10T20:50:04.954Z"
+    },
+    {
+      "kind": "wgx",
+      "path": "wgx/CuNNy2/CuNNy-4x12-NVL.wgx",
+      "id": "CuNNy2-CuNNy-4x12-NVL",
+      "name": "CuNNy-04x12",
+      "family": "CuNNy2",
+      "description": "in (3x12)",
+      "source": "CuNNy2/CuNNy-4x12-NVL.wgsl",
+      "tags": [
+        "CuNNy2"
+      ],
+      "passCount": 6,
+      "parameters": [],
+      "manifestVersion": 1,
+      "hash": "b214cbb46b7f0aaf1fd3e0731c64df530e11811fad8ebd540c151935e1c9d6d8",
+      "bytes": 35491,
+      "builtAt": "2026-11-10T20:50:04.970Z"
+    },
+    {
+      "kind": "wgx",
+      "path": "wgx/CuNNy2/CuNNy-4x16-NVL.wgx",
+      "id": "CuNNy2-CuNNy-4x16-NVL",
+      "name": "CuNNy-04x16",
+      "family": "CuNNy2",
+      "description": "in (3x16)",
+      "source": "CuNNy2/CuNNy-4x16-NVL.wgsl",
+      "tags": [
+        "CuNNy2"
+      ],
+      "passCount": 6,
+      "parameters": [],
+      "manifestVersion": 1,
+      "hash": "408f184aaa2e9bd7470469d1be1d0eff8b022f190a19aea606158e3bc04f5c23",
+      "bytes": 52072,
+      "builtAt": "2026-11-10T20:50:04.997Z"
+    },
+    {
+      "kind": "wgx",
+      "path": "wgx/CuNNy2/CuNNy-4x24-NVL.wgx",
+      "id": "CuNNy2-CuNNy-4x24-NVL",
+      "name": "CuNNy-04x24",
+      "family": "CuNNy2",
+      "description": "in (3x24) (part 1/2)",
+      "source": "CuNNy2/CuNNy-4x24-NVL.wgsl",
+      "tags": [
+        "CuNNy2"
+      ],
+      "passCount": 11,
+      "parameters": [],
+      "manifestVersion": 1,
+      "hash": "7db1d9a3796803d4b5396355b580200fbe5a19bb6fc9922dccc7187cd4f2a5be",
+      "bytes": 178685,
+      "builtAt": "2026-11-10T20:50:05.127Z"
+    },
+    {
+      "kind": "wgx",
+      "path": "wgx/CuNNy2/CuNNy-4x32-NVL.wgx",
+      "id": "CuNNy2-CuNNy-4x32-NVL",
+      "name": "CuNNy-04x32",
+      "family": "CuNNy2",
+      "description": "in (3x32) (part 1/2)",
+      "source": "CuNNy2/CuNNy-4x32-NVL.wgsl",
+      "tags": [
+        "CuNNy2"
+      ],
+      "passCount": 11,
+      "parameters": [],
+      "manifestVersion": 1,
+      "hash": "8e30521fa8f9942d5bf6d6e8a6d41c7c70bc1e4f1af412b60d31428f799f4ebe",
+      "bytes": 297584,
+      "builtAt": "2026-11-10T20:50:05.435Z"
+    },
+    {
+      "kind": "wgx",
+      "path": "wgx/CuNNy2/CuNNy-8x32-NVL.wgx",
+      "id": "CuNNy2-CuNNy-8x32-NVL",
+      "name": "CuNNy-08x32",
+      "family": "CuNNy2",
+      "description": "in (3x32) (part 1/2)",
+      "source": "CuNNy2/CuNNy-8x32-NVL.wgsl",
+      "tags": [
+        "CuNNy2"
+      ],
+      "passCount": 19,
+      "parameters": [],
+      "manifestVersion": 1,
+      "hash": "3aa6a4bab4a191ecb82815d39fc8a9981d0fa1ec5c4397ff0c719ec4f04a18bf",
+      "bytes": 566706,
+      "builtAt": "2026-11-10T20:50:05.990Z"
+    },
+    {
+      "kind": "wgx",
+      "path": "wgx/Filters/Deband.wgx",
+      "id": "Filters-Deband",
+      "name": "Deband",
+      "family": "Filters",
+      "description": "Debanding (stochastic gradient flattening + grain)",
+      "source": "Filters/Deband.wgsl",
+      "tags": [
+        "Filters"
+      ],
+      "passCount": 1,
+      "parameters": [
+        {
+          "name": "threshold",
+          "type": "float",
+          "label": "Threshold",
+          "default": 64,
+          "min": 0,
+          "max": 512,
+          "step": 4
+        },
+        {
+          "name": "range",
+          "type": "float",
+          "label": "Range",
+          "default": 8,
+          "min": 0,
+          "max": 16,
+          "step": 0.1
+        },
+        {
+          "name": "iterations",
+          "type": "int",
+          "label": "Iterations",
+          "default": 4,
+          "min": 1,
+          "max": 10,
+          "step": 1
+        },
+        {
+          "name": "grain",
+          "type": "float",
+          "label": "Grain",
+          "default": 48,
+          "min": 0,
+          "max": 256,
+          "step": 4
+        }
+      ],
+      "manifestVersion": 1,
+      "hash": "d7558a1d27c5d1001af58ce598443a6d1274e2e62b0f8cc7333b0357e7fba8ae",
+      "bytes": 2928,
+      "builtAt": "2026-11-10T20:50:06.970Z"
+    },
+    {
+      "kind": "wgx",
+      "path": "wgx/Filters/ImageAdjustment.wgx",
+      "id": "Filters-ImageAdjustment",
+      "name": "ImageAdjustment",
+      "family": "Filters",
+      "description": "HSV saturation/luminance + contrast/brightness/black level/gamma + channel gain",
+      "source": "Filters/ImageAdjustment.wgsl",
+      "tags": [
+        "Filters"
+      ],
+      "passCount": 1,
+      "parameters": [
+        {
+          "name": "targetGamma",
+          "type": "float",
+          "label": "Target Gamma",
+          "default": 2.2,
+          "min": 0.01,
+          "max": 5,
+          "step": 0.01
+        },
+        {
+          "name": "monitorGamma",
+          "type": "float",
+          "label": "Monitor Gamma",
+          "default": 2.2,
+          "min": 0.01,
+          "max": 5,
+          "step": 0.01
+        },
+        {
+          "name": "saturation",
+          "type": "float",
+          "label": "Saturation",
+          "default": 1,
+          "min": 0,
+          "max": 5,
+          "step": 0.01
+        },
+        {
+          "name": "luminance",
+          "type": "float",
+          "label": "Luminance",
+          "default": 1,
+          "min": 0,
+          "max": 2,
+          "step": 0.01
+        },
+        {
+          "name": "contrast",
+          "type": "float",
+          "label": "Contrast",
+          "default": 1,
+          "min": 0,
+          "max": 10,
+          "step": 0.1
+        },
+        {
+          "name": "brightBoost",
+          "type": "float",
+          "label": "Brightness Boost",
+          "default": 0,
+          "min": -1,
+          "max": 1,
+          "step": 0.01
+        },
+        {
+          "name": "blackLevel",
+          "type": "float",
+          "label": "Black Level",
+          "default": 0,
+          "min": -1,
+          "max": 1,
+          "step": 0.01
+        },
+        {
+          "name": "r",
+          "type": "float",
+          "label": "Red Channel",
+          "default": 1,
+          "min": 0,
+          "max": 2,
+          "step": 0.01
+        },
+        {
+          "name": "g",
+          "type": "float",
+          "label": "Green Channel",
+          "default": 1,
+          "min": 0,
+          "max": 2,
+          "step": 0.01
+        },
+        {
+          "name": "b",
+          "type": "float",
+          "label": "Blue Channel",
+          "default": 1,
+          "min": 0,
+          "max": 2,
+          "step": 0.01
+        }
+      ],
+      "manifestVersion": 1,
+      "hash": "6fb9672d1a37df7d3b89f2c8d6f0dbafa44567f43597f825eb08dce34f1bd9bd",
+      "bytes": 3011,
+      "builtAt": "2026-11-10T20:50:06.971Z"
+    },
+    {
+      "kind": "wgx",
+      "path": "wgx/FSR/FSR_EASU.wgx",
+      "id": "FSR-FSR_EASU",
+      "name": "FSR_EASU",
+      "family": "FSR",
+      "description": "FidelityFX EASU：邊緣自適應 12-tap 放大（任意倍率）",
+      "source": "FSR/FSR_EASU.wgsl",
+      "tags": [
+        "FSR"
+      ],
+      "passCount": 1,
+      "parameters": [],
+      "manifestVersion": 1,
+      "hash": "bc630b1d7cf242241159757e48d54ac53ce5136738f4649111326448838b649e",
+      "bytes": 4706,
+      "builtAt": "2026-11-10T20:50:06.963Z"
+    },
+    {
+      "kind": "wgx",
+      "path": "wgx/FSR/FSR_RCAS.wgx",
+      "id": "FSR-FSR_RCAS",
+      "name": "FSR_RCAS",
+      "family": "FSR",
+      "description": "FidelityFX RCAS：穩健的對比自適應銳化",
+      "source": "FSR/FSR_RCAS.wgsl",
+      "tags": [
+        "FSR"
+      ],
+      "passCount": 1,
+      "parameters": [
+        {
+          "name": "sharpness",
+          "type": "float",
+          "label": "Sharpness",
+          "default": 0.87,
+          "min": 0,
+          "max": 1,
+          "step": 0.01
+        }
+      ],
+      "manifestVersion": 1,
+      "hash": "d7f920f36e411eab117aa24a1dfc04498241114fbc5087f08625063c36116f00",
+      "bytes": 3124,
+      "builtAt": "2026-11-10T20:50:06.964Z"
+    },
+    {
+      "kind": "wgx",
+      "path": "wgx/FSRCNNX/FSRCNNX.wgx",
+      "id": "FSRCNNX-FSRCNNX",
+      "name": "FSRCNNX",
+      "family": "FSRCNNX",
+      "description": "FSRCNN-X feature map (luma + 5x5 conv)",
+      "source": "FSRCNNX/FSRCNNX.wgsl",
+      "tags": [
+        "FSRCNNX"
+      ],
+      "passCount": 6,
+      "parameters": [],
+      "manifestVersion": 1,
+      "hash": "b91eeb2f856335956d66451f74e502593acd45d7e4b22ae8062c2e878970a8fa",
+      "bytes": 37560,
+      "builtAt": "2026-11-10T20:50:06.951Z"
+    },
+    {
+      "kind": "wgx",
+      "path": "wgx/FSRCNNX/FSRCNNX_LineArt.wgx",
+      "id": "FSRCNNX-FSRCNNX_LineArt",
+      "name": "FSRCNNX_LineArt",
+      "family": "FSRCNNX",
+      "description": "FSRCNN-X feature map (luma + 5x5 conv)",
+      "source": "FSRCNNX/FSRCNNX_LineArt.wgsl",
+      "tags": [
+        "FSRCNNX"
+      ],
+      "passCount": 6,
+      "parameters": [],
+      "manifestVersion": 1,
+      "hash": "ac32842464d463a5bf2fa686dda88ecce24f4b84df3c42acfabfccf2600e0f45",
+      "bytes": 37493,
+      "builtAt": "2026-11-10T20:50:06.960Z"
+    },
+    {
+      "kind": "wgx",
+      "path": "wgx/FXAA/FXAA_High.wgx",
+      "id": "FXAA-FXAA_High",
+      "name": "FXAA_High",
+      "family": "FXAA",
+      "description": "FXAA PRESET 4（搜尋 24 步）",
+      "source": "FXAA/FXAA_High.wgsl",
+      "tags": [
+        "FXAA"
+      ],
+      "passCount": 1,
+      "parameters": [],
+      "manifestVersion": 1,
+      "hash": "9eae82ea833e012cac1eb1f8ab21f6b8402137a3d46d2c2f7bb0286fbd1fb8ab",
+      "bytes": 3010,
+      "builtAt": "2026-11-10T20:50:06.966Z"
+    },
+    {
+      "kind": "wgx",
+      "path": "wgx/FXAA/FXAA_Medium.wgx",
+      "id": "FXAA-FXAA_Medium",
+      "name": "FXAA_Medium",
+      "family": "FXAA",
+      "description": "FXAA PRESET 3（搜尋 16 步）",
+      "source": "FXAA/FXAA_Medium.wgsl",
+      "tags": [
+        "FXAA"
+      ],
+      "passCount": 1,
+      "parameters": [],
+      "manifestVersion": 1,
+      "hash": "75b9bdc1a5136bc1c11422f74c55d6a86abd3e234f4fa9e1e5a7a65794efbb47",
+      "bytes": 3013,
+      "builtAt": "2026-11-10T20:50:06.967Z"
+    },
+    {
+      "kind": "wgx",
+      "path": "wgx/FXAA/FXAA_Ultra.wgx",
+      "id": "FXAA-FXAA_Ultra",
+      "name": "FXAA_Ultra",
+      "family": "FXAA",
+      "description": "FXAA PRESET 5（搜尋 32 步）",
+      "source": "FXAA/FXAA_Ultra.wgsl",
+      "tags": [
+        "FXAA"
+      ],
+      "passCount": 1,
+      "parameters": [],
+      "manifestVersion": 1,
+      "hash": "272dc3576b0522422200ff65f6dbde538b93d4cf678d9890baaf8bafdfe7271a",
+      "bytes": 3009,
+      "builtAt": "2026-11-10T20:50:06.969Z"
+    },
+    {
+      "kind": "wgx",
+      "path": "wgx/NIS/NIS.wgx",
+      "id": "NIS-NIS",
+      "name": "NIS",
+      "family": "NIS",
+      "description": "NVIDIA Image Scaling — NVScaler (6-tap + directional adaptive sharpening)",
+      "source": "NIS/NIS.wgsl",
+      "tags": [
+        "NIS"
+      ],
+      "passCount": 1,
+      "parameters": [
+        {
+          "name": "sharpness",
+          "type": "float",
+          "label": "Sharpness",
+          "default": 0.5,
+          "min": 0,
+          "max": 1,
+          "step": 0.01
+        }
+      ],
+      "manifestVersion": 1,
+      "hash": "f1891ba5f630c45889ce7a2696cc8201c13af163da5a75d704e747bb77841ed4",
+      "bytes": 8243,
+      "builtAt": "2026-11-10T20:50:06.977Z"
+    },
+    {
+      "kind": "wgx",
+      "path": "wgx/NIS/NVSharpen.wgx",
+      "id": "NIS-NVSharpen",
+      "name": "NVSharpen",
+      "family": "NIS",
+      "description": "NVIDIA Image Scaling — NVSharpen (adaptive directional sharpening, 1:1)",
+      "source": "NIS/NVSharpen.wgsl",
+      "tags": [
+        "NIS"
+      ],
+      "passCount": 1,
+      "parameters": [
+        {
+          "name": "sharpness",
+          "type": "float",
+          "label": "Sharpness",
+          "default": 0.5,
+          "min": 0,
+          "max": 1,
+          "step": 0.01
+        }
+      ],
+      "manifestVersion": 1,
+      "hash": "6e1e26879d9f96a42af559323ebf76793d95bbbed26dbb8450441d29aa9257ea",
+      "bytes": 4429,
+      "builtAt": "2026-11-10T20:50:06.980Z"
+    },
+    {
+      "kind": "wgx",
+      "path": "wgx/NNEDI3/NNEDI3_nns16_win8x4.wgx",
+      "id": "NNEDI3-NNEDI3_nns16_win8x4",
+      "name": "NNEDI3_016_4",
+      "family": "NNEDI3",
+      "description": "NNEDI3 (double_y, nns16, win8x4)",
+      "source": "NNEDI3/NNEDI3_nns16_win8x4.wgsl",
+      "tags": [
+        "NNEDI3"
+      ],
+      "passCount": 2,
+      "parameters": [],
+      "manifestVersion": 1,
+      "hash": "da365d9669ba1dc7f503cae57d2235b6dca93acdd1e99eb8906555338fca333f",
+      "bytes": 19561,
+      "builtAt": "2026-11-10T20:50:07.510Z"
+    },
+    {
+      "kind": "wgx",
+      "path": "wgx/NNEDI3/NNEDI3_nns16_win8x6.wgx",
+      "id": "NNEDI3-NNEDI3_nns16_win8x6",
+      "name": "NNEDI3_016_6",
+      "family": "NNEDI3",
+      "description": "NNEDI3 (double_y, nns16, win8x6)",
+      "source": "NNEDI3/NNEDI3_nns16_win8x6.wgsl",
+      "tags": [
+        "NNEDI3"
+      ],
+      "passCount": 2,
+      "parameters": [],
+      "manifestVersion": 1,
+      "hash": "5b5ee72a7b4f87ac6a5736d2c0195938469dc4a43784be2e35f42aa435c7650d",
+      "bytes": 26103,
+      "builtAt": "2026-11-10T20:50:07.526Z"
+    },
+    {
+      "kind": "wgx",
+      "path": "wgx/NNEDI3/NNEDI3_nns32_win8x4.wgx",
+      "id": "NNEDI3-NNEDI3_nns32_win8x4",
+      "name": "NNEDI3_032_4",
+      "family": "NNEDI3",
+      "description": "NNEDI3 (double_y, nns32, win8x4)",
+      "source": "NNEDI3/NNEDI3_nns32_win8x4.wgsl",
+      "tags": [
+        "NNEDI3"
+      ],
+      "passCount": 2,
+      "parameters": [],
+      "manifestVersion": 1,
+      "hash": "b2ab95d90ca8ac3b7f45f3e768d935e1c76bad9fc7455ba787bbbdf0f4b1d1e9",
+      "bytes": 32307,
+      "builtAt": "2026-11-10T20:50:09.234Z"
+    },
+    {
+      "kind": "wgx",
+      "path": "wgx/NNEDI3/NNEDI3_nns32_win8x6.wgx",
+      "id": "NNEDI3-NNEDI3_nns32_win8x6",
+      "name": "NNEDI3_032_6",
+      "family": "NNEDI3",
+      "description": "NNEDI3 (double_y, nns32, win8x6)",
+      "source": "NNEDI3/NNEDI3_nns32_win8x6.wgsl",
+      "tags": [
+        "NNEDI3"
+      ],
+      "passCount": 2,
+      "parameters": [],
+      "manifestVersion": 1,
+      "hash": "de008751e1c49597366d7e659a7f397003e6aac7fe3b05d54b02e74e2f36cea7",
+      "bytes": 44792,
+      "builtAt": "2026-11-10T20:50:09.264Z"
+    },
+    {
+      "kind": "wgx",
+      "path": "wgx/NNEDI3/NNEDI3_nns64_win8x4.wgx",
+      "id": "NNEDI3-NNEDI3_nns64_win8x4",
+      "name": "NNEDI3_064_4",
+      "family": "NNEDI3",
+      "description": "NNEDI3 (double_y, nns64, win8x4)",
+      "source": "NNEDI3/NNEDI3_nns64_win8x4.wgsl",
+      "tags": [
+        "NNEDI3"
+      ],
+      "passCount": 2,
+      "parameters": [],
+      "manifestVersion": 1,
+      "hash": "ef24ebcd06f2bbf7e950077827e12d0915c7db76acee26ac7294386cee35b8df",
+      "bytes": 57355,
+      "builtAt": "2026-11-10T20:50:09.329Z"
+    },
+    {
+      "kind": "wgx",
+      "path": "wgx/NNEDI3/NNEDI3_nns64_win8x6.wgx",
+      "id": "NNEDI3-NNEDI3_nns64_win8x6",
+      "name": "NNEDI3_064_6",
+      "family": "NNEDI3",
+      "description": "NNEDI3 (double_y, nns64, win8x6)",
+      "source": "NNEDI3/NNEDI3_nns64_win8x6.wgsl",
+      "tags": [
+        "NNEDI3"
+      ],
+      "passCount": 2,
+      "parameters": [],
+      "manifestVersion": 1,
+      "hash": "46080e146a9321205ba3c21ddf0a2a74ef7b75a9ae89bf8964afc5f8c6d02f2f",
+      "bytes": 81980,
+      "builtAt": "2026-11-10T20:50:09.438Z"
+    },
+    {
+      "kind": "wgx",
+      "path": "wgx/NNEDI3/NNEDI3_nns128_win8x4.wgx",
+      "id": "NNEDI3-NNEDI3_nns128_win8x4",
+      "name": "NNEDI3_128_4",
+      "family": "NNEDI3",
+      "description": "NNEDI3 (double_y, nns128, win8x4)",
+      "source": "NNEDI3/NNEDI3_nns128_win8x4.wgsl",
+      "tags": [
+        "NNEDI3"
+      ],
+      "passCount": 2,
+      "parameters": [],
+      "manifestVersion": 1,
+      "hash": "4a9424613484a6e071adcfb0d2f74beab20a429dbb4364c6da587287cc80c67e",
+      "bytes": 106490,
+      "builtAt": "2026-11-10T20:50:07.170Z"
+    },
+    {
+      "kind": "wgx",
+      "path": "wgx/NNEDI3/NNEDI3_nns128_win8x6.wgx",
+      "id": "NNEDI3-NNEDI3_nns128_win8x6",
+      "name": "NNEDI3_128_6",
+      "family": "NNEDI3",
+      "description": "NNEDI3 (double_y, nns128, win8x6)",
+      "source": "NNEDI3/NNEDI3_nns128_win8x6.wgsl",
+      "tags": [
+        "NNEDI3"
+      ],
+      "passCount": 2,
+      "parameters": [],
+      "manifestVersion": 1,
+      "hash": "33cf40fc28ffe0a4816bf3b7bb81c8f6eb3383f6829ef0f5770de0399c072295",
+      "bytes": 155458,
+      "builtAt": "2026-11-10T20:50:07.497Z"
+    },
+    {
+      "kind": "wgx",
+      "path": "wgx/NNEDI3/NNEDI3_nns256_win8x4.wgx",
+      "id": "NNEDI3-NNEDI3_nns256_win8x4",
+      "name": "NNEDI3_256_4",
+      "family": "NNEDI3",
+      "description": "NNEDI3 (double_y, nns256, win8x4)",
+      "source": "NNEDI3/NNEDI3_nns256_win8x4.wgsl",
+      "tags": [
+        "NNEDI3"
+      ],
+      "passCount": 2,
+      "parameters": [],
+      "manifestVersion": 1,
+      "hash": "72f0f0e893b39848eb0d65b695c473ffdf41fb51cb6e2297996af19ca7f48642",
+      "bytes": 204782,
+      "builtAt": "2026-11-10T20:50:08.105Z"
+    },
+    {
+      "kind": "wgx",
+      "path": "wgx/NNEDI3/NNEDI3_nns256_win8x6.wgx",
+      "id": "NNEDI3-NNEDI3_nns256_win8x6",
+      "name": "NNEDI3_256_6",
+      "family": "NNEDI3",
+      "description": "NNEDI3 (double_y, nns256, win8x6)",
+      "source": "NNEDI3/NNEDI3_nns256_win8x6.wgsl",
+      "tags": [
+        "NNEDI3"
+      ],
+      "passCount": 2,
+      "parameters": [],
+      "manifestVersion": 1,
+      "hash": "23b13caa9a6a8ab92112b8ee3e99ddc07620804258b64b3697a10fd762c3f458",
+      "bytes": 302697,
+      "builtAt": "2026-11-10T20:50:09.209Z"
+    },
+    {
+      "kind": "wgx",
+      "path": "wgx/OpenNR/OpenNR_1pass.wgx",
+      "id": "OpenNR-OpenNR_1pass",
+      "name": "OpenNR 1pass",
+      "family": "OpenNR",
+      "description": "stage: 16 input channels (noise + colour + settings)",
+      "source": "OpenNR/OpenNR_1pass.wgsl",
+      "tags": [
+        "OpenNR"
+      ],
+      "passCount": 37,
+      "parameters": [
+        {
+          "name": "Strength",
+          "type": "int",
+          "label": "Strength",
+          "default": 100,
+          "min": 0,
+          "max": 100,
+          "step": 1
+        },
+        {
+          "name": "Style",
+          "type": "int",
+          "label": "Colour Style (0 Standard / 1 Natural / 2 Cinematic)",
+          "default": 0,
+          "min": 0,
+          "max": 2,
+          "step": 1
+        },
+        {
+          "name": "Tone",
+          "type": "int",
+          "label": "Local Tone Strength",
+          "default": 100,
+          "min": 0,
+          "max": 100,
+          "step": 1
+        },
+        {
+          "name": "Structure",
+          "type": "int",
+          "label": "Local Structure Strength",
+          "default": 100,
+          "min": 0,
+          "max": 100,
+          "step": 1
+        },
+        {
+          "name": "Detail",
+          "type": "int",
+          "label": "Detail Strength",
+          "default": 100,
+          "min": 0,
+          "max": 100,
+          "step": 1
+        },
+        {
+          "name": "Colour",
+          "type": "int",
+          "label": "Colour Strength",
+          "default": 100,
+          "min": 0,
+          "max": 100,
+          "step": 1
+        },
+        {
+          "name": "Apply",
+          "type": "int",
+          "label": "Apply (0 = passthrough)",
+          "default": 1,
+          "min": 0,
+          "max": 1,
+          "step": 1
+        }
+      ],
+      "manifestVersion": 1,
+      "hash": "0dc21a5b4fead73e1bd6f3212f3a030eb9f0dc4572268de6962c9d06cadeb4e6",
+      "bytes": 105686,
+      "builtAt": "2026-11-10T20:50:09.460Z"
+    },
+    {
+      "kind": "wgx",
+      "path": "wgx/OpenNR/OpenNR_spike.wgx",
+      "id": "OpenNR-OpenNR_spike",
+      "name": "OpenNR_spike",
+      "family": "OpenNR",
+      "description": "3x3 conv（packed f16 buffers）",
+      "source": "OpenNR/OpenNR_spike.wgsl",
+      "tags": [
+        "OpenNR"
+      ],
+      "passCount": 1,
+      "parameters": [],
+      "manifestVersion": 1,
+      "hash": "073340e3d46afab30bb13ae6c5cd16395d070adf14dfe9f5927cfcc5f011058b",
+      "bytes": 3003,
+      "builtAt": "2026-11-10T20:50:09.464Z"
+    },
+    {
+      "kind": "wgx",
+      "path": "wgx/RAVU/RAVU_3x_R2.wgx",
+      "id": "RAVU-RAVU_3x_R2",
+      "name": "RAVU_3x_R2",
+      "family": "RAVU",
+      "description": "RAVU-3x (luma, r2)",
+      "source": "RAVU/RAVU_3x_R2.wgsl",
+      "tags": [
+        "RAVU"
+      ],
+      "passCount": 1,
+      "parameters": [],
+      "manifestVersion": 1,
+      "hash": "4d223f98c465c9e0ff5c3e2c20e952bbfddef07749f987e1a1ef48adb70e1f20",
+      "bytes": 18585,
+      "builtAt": "2026-11-10T20:50:09.467Z"
+    },
+    {
+      "kind": "wgx",
+      "path": "wgx/RAVU/RAVU_3x_R2_RGB.wgx",
+      "id": "RAVU-RAVU_3x_R2_RGB",
+      "name": "RAVU_3x_R2_RGB",
+      "family": "RAVU",
+      "description": "RAVU-3x (rgb, r2)",
+      "source": "RAVU/RAVU_3x_R2_RGB.wgsl",
+      "tags": [
+        "RAVU"
+      ],
+      "passCount": 1,
+      "parameters": [],
+      "manifestVersion": 1,
+      "hash": "55e3c66dc8bf85839be3a2726c384d3768cd40a7c8a7514d46a1ff41b4ce9062",
+      "bytes": 18670,
+      "builtAt": "2026-11-10T20:50:09.470Z"
+    },
+    {
+      "kind": "wgx",
+      "path": "wgx/RAVU/RAVU_3x_R3.wgx",
+      "id": "RAVU-RAVU_3x_R3",
+      "name": "RAVU_3x_R3",
+      "family": "RAVU",
+      "description": "RAVU-3x (luma, r3)",
+      "source": "RAVU/RAVU_3x_R3.wgsl",
+      "tags": [
+        "RAVU"
+      ],
+      "passCount": 1,
+      "parameters": [],
+      "manifestVersion": 1,
+      "hash": "6e27eb0da77de0edc2db41614c6fa15e280e58275da6f79a9467868c767925d9",
+      "bytes": 45158,
+      "builtAt": "2026-11-10T20:50:09.473Z"
+    },
+    {
+      "kind": "wgx",
+      "path": "wgx/RAVU/RAVU_3x_R3_RGB.wgx",
+      "id": "RAVU-RAVU_3x_R3_RGB",
+      "name": "RAVU_3x_R3_RGB",
+      "family": "RAVU",
+      "description": "RAVU-3x (rgb, r3)",
+      "source": "RAVU/RAVU_3x_R3_RGB.wgsl",
+      "tags": [
+        "RAVU"
+      ],
+      "passCount": 1,
+      "parameters": [],
+      "manifestVersion": 1,
+      "hash": "19413dcd3c82bd3dd6b4ee4a71d42580eff93ea2617adade0336611190c4ae23",
+      "bytes": 45243,
+      "builtAt": "2026-11-10T20:50:09.476Z"
+    },
+    {
+      "kind": "wgx",
+      "path": "wgx/RAVU/RAVU_3x_R4.wgx",
+      "id": "RAVU-RAVU_3x_R4",
+      "name": "RAVU_3x_R4",
+      "family": "RAVU",
+      "description": "RAVU-3x (luma, r4)",
+      "source": "RAVU/RAVU_3x_R4.wgsl",
+      "tags": [
+        "RAVU"
+      ],
+      "passCount": 1,
+      "parameters": [],
+      "manifestVersion": 1,
+      "hash": "d053ea04e171948d5833ced4065f816ba5821f49e70058df77336a16a8da3e6e",
+      "bytes": 85567,
+      "builtAt": "2026-11-10T20:50:09.482Z"
+    },
+    {
+      "kind": "wgx",
+      "path": "wgx/RAVU/RAVU_3x_R4_RGB.wgx",
+      "id": "RAVU-RAVU_3x_R4_RGB",
+      "name": "RAVU_3x_R4_RGB",
+      "family": "RAVU",
+      "description": "RAVU-3x (rgb, r4)",
+      "source": "RAVU/RAVU_3x_R4_RGB.wgsl",
+      "tags": [
+        "RAVU"
+      ],
+      "passCount": 1,
+      "parameters": [],
+      "manifestVersion": 1,
+      "hash": "ede67ee73e37eb2601c52db2ba7817b3f9dff0b9e5327c72bc606accc9822e53",
+      "bytes": 85669,
+      "builtAt": "2026-11-10T20:50:09.486Z"
+    },
+    {
+      "kind": "wgx",
+      "path": "wgx/RAVU/RAVU_Lite_AR_R2.wgx",
+      "id": "RAVU-RAVU_Lite_AR_R2",
+      "name": "RAVU_Lite_AR_R2",
+      "family": "RAVU",
+      "description": "RAVU-Lite-AR (r2, compute)",
+      "source": "RAVU/RAVU_Lite_AR_R2.wgsl",
+      "tags": [
+        "RAVU"
+      ],
+      "passCount": 1,
+      "parameters": [],
+      "manifestVersion": 1,
+      "hash": "5d4b782b3b8339fc8a11a58fe573282c083e72782ac6505a1cbac10f1d18c991",
+      "bytes": 13008,
+      "builtAt": "2026-11-10T20:50:09.489Z"
+    },
+    {
+      "kind": "wgx",
+      "path": "wgx/RAVU/RAVU_Lite_AR_R3.wgx",
+      "id": "RAVU-RAVU_Lite_AR_R3",
+      "name": "RAVU_Lite_AR_R3",
+      "family": "RAVU",
+      "description": "RAVU-Lite-AR (r3, compute)",
+      "source": "RAVU/RAVU_Lite_AR_R3.wgsl",
+      "tags": [
+        "RAVU"
+      ],
+      "passCount": 1,
+      "parameters": [],
+      "manifestVersion": 1,
+      "hash": "e6390ad54d0d8ceb39454a51c0c7a7811802ab4e60cddc5921888b265bf045c2",
+      "bytes": 30589,
+      "builtAt": "2026-11-10T20:50:09.492Z"
+    },
+    {
+      "kind": "wgx",
+      "path": "wgx/RAVU/RAVU_Lite_AR_R4.wgx",
+      "id": "RAVU-RAVU_Lite_AR_R4",
+      "name": "RAVU_Lite_AR_R4",
+      "family": "RAVU",
+      "description": "RAVU-Lite-AR (r4, compute)",
+      "source": "RAVU/RAVU_Lite_AR_R4.wgsl",
+      "tags": [
+        "RAVU"
+      ],
+      "passCount": 1,
+      "parameters": [],
+      "manifestVersion": 1,
+      "hash": "edcbcebd728bdc931d2790097abae7f2921a6c586009acfbdf91ffe4c146bdb6",
+      "bytes": 57221,
+      "builtAt": "2026-11-10T20:50:09.497Z"
+    },
+    {
+      "kind": "wgx",
+      "path": "wgx/RAVU/RAVU_Lite_R2.wgx",
+      "id": "RAVU-RAVU_Lite_R2",
+      "name": "RAVU_Lite_R2",
+      "family": "RAVU",
+      "description": "RAVU-Lite (r2, compute)",
+      "source": "RAVU/RAVU_Lite_R2.wgsl",
+      "tags": [
+        "RAVU"
+      ],
+      "passCount": 1,
+      "parameters": [],
+      "manifestVersion": 1,
+      "hash": "a8f7c011d7ec0de1c86f12561ae4a17ff5843bc88da31c5c1b425ff4f46b90da",
+      "bytes": 12729,
+      "builtAt": "2026-11-10T20:50:09.499Z"
+    },
+    {
+      "kind": "wgx",
+      "path": "wgx/RAVU/RAVU_Lite_R3.wgx",
+      "id": "RAVU-RAVU_Lite_R3",
+      "name": "RAVU_Lite_R3",
+      "family": "RAVU",
+      "description": "RAVU-Lite (r3, compute)",
+      "source": "RAVU/RAVU_Lite_R3.wgsl",
+      "tags": [
+        "RAVU"
+      ],
+      "passCount": 1,
+      "parameters": [],
+      "manifestVersion": 1,
+      "hash": "a272960416722be845eda8c7d72e67e8586fbe8373429010ca07b494223d172d",
+      "bytes": 30259,
+      "builtAt": "2026-11-10T20:50:09.501Z"
+    },
+    {
+      "kind": "wgx",
+      "path": "wgx/RAVU/RAVU_Lite_R4.wgx",
+      "id": "RAVU-RAVU_Lite_R4",
+      "name": "RAVU_Lite_R4",
+      "family": "RAVU",
+      "description": "RAVU-Lite (r4, compute)",
+      "source": "RAVU/RAVU_Lite_R4.wgsl",
+      "tags": [
+        "RAVU"
+      ],
+      "passCount": 1,
+      "parameters": [],
+      "manifestVersion": 1,
+      "hash": "c92e732b3b0dfe996be1d1c765dd48738139f90f446fe480829a3b58941b4290",
+      "bytes": 56898,
+      "builtAt": "2026-11-10T20:50:09.504Z"
+    },
+    {
+      "kind": "wgx",
+      "path": "wgx/RAVU/RAVU_R2.wgx",
+      "id": "RAVU-RAVU_R2",
+      "name": "RAVU_R2",
+      "family": "RAVU",
+      "description": "RAVU (step1, luma, r2, compute)",
+      "source": "RAVU/RAVU_R2.wgsl",
+      "tags": [
+        "RAVU"
+      ],
+      "passCount": 2,
+      "parameters": [],
+      "manifestVersion": 1,
+      "hash": "4b7f03d910147d4719a08f216cc7008226fb62f175c2f327287a3843f3ebdc7a",
+      "bytes": 16221,
+      "builtAt": "2026-11-10T20:50:09.508Z"
+    },
+    {
+      "kind": "wgx",
+      "path": "wgx/RAVU/RAVU_R2_RGB.wgx",
+      "id": "RAVU-RAVU_R2_RGB",
+      "name": "RAVU_R2_RGB",
+      "family": "RAVU",
+      "description": "RAVU (step1, rgb, r2, compute)",
+      "source": "RAVU/RAVU_R2_RGB.wgsl",
+      "tags": [
+        "RAVU"
+      ],
+      "passCount": 2,
+      "parameters": [],
+      "manifestVersion": 1,
+      "hash": "6a401c7bc5887817bdf0d61ed9732e6eea86ec5e09056c0bece0746760137a34",
+      "bytes": 16249,
+      "builtAt": "2026-11-10T20:50:09.512Z"
+    },
+    {
+      "kind": "wgx",
+      "path": "wgx/RAVU/RAVU_R3.wgx",
+      "id": "RAVU-RAVU_R3",
+      "name": "RAVU_R3",
+      "family": "RAVU",
+      "description": "RAVU (step1, luma, r3, compute)",
+      "source": "RAVU/RAVU_R3.wgsl",
+      "tags": [
+        "RAVU"
+      ],
+      "passCount": 2,
+      "parameters": [],
+      "manifestVersion": 1,
+      "hash": "3a06b68bb572e0975b51e350529e3d16156fc96df4ec0ddc85909656f5f5f78e",
+      "bytes": 30346,
+      "builtAt": "2026-11-10T20:50:09.516Z"
+    },
+    {
+      "kind": "wgx",
+      "path": "wgx/RAVU/RAVU_R3_RGB.wgx",
+      "id": "RAVU-RAVU_R3_RGB",
+      "name": "RAVU_R3_RGB",
+      "family": "RAVU",
+      "description": "RAVU (step1, rgb, r3, compute)",
+      "source": "RAVU/RAVU_R3_RGB.wgsl",
+      "tags": [
+        "RAVU"
+      ],
+      "passCount": 2,
+      "parameters": [],
+      "manifestVersion": 1,
+      "hash": "2df5ef468ca0754948debe42a24364ece35532e3ff2c640bf2e5f44531208351",
+      "bytes": 30373,
+      "builtAt": "2026-11-10T20:50:09.521Z"
+    },
+    {
+      "kind": "wgx",
+      "path": "wgx/RAVU/RAVU_R4.wgx",
+      "id": "RAVU-RAVU_R4",
+      "name": "RAVU_R4",
+      "family": "RAVU",
+      "description": "RAVU (step1, luma, r4, compute)",
+      "source": "RAVU/RAVU_R4.wgsl",
+      "tags": [
+        "RAVU"
+      ],
+      "passCount": 2,
+      "parameters": [],
+      "manifestVersion": 1,
+      "hash": "c74f88fc43d9d9a1a208eb62ded9e2621df2d70a754a77c6b3b6bf6dbf927542",
+      "bytes": 48751,
+      "builtAt": "2026-11-10T20:50:09.528Z"
+    },
+    {
+      "kind": "wgx",
+      "path": "wgx/RAVU/RAVU_R4_RGB.wgx",
+      "id": "RAVU-RAVU_R4_RGB",
+      "name": "RAVU_R4_RGB",
+      "family": "RAVU",
+      "description": "RAVU (step1, rgb, r4, compute)",
+      "source": "RAVU/RAVU_R4_RGB.wgsl",
+      "tags": [
+        "RAVU"
+      ],
+      "passCount": 2,
+      "parameters": [],
+      "manifestVersion": 1,
+      "hash": "c48268c3f6e085aa783cde6fb7462267963ea3aec3bac6958c99156bfdc23a84",
+      "bytes": 48789,
+      "builtAt": "2026-11-10T20:50:09.534Z"
+    },
+    {
+      "kind": "wgx",
+      "path": "wgx/RAVU/RAVU_Zoom_AR_R2.wgx",
+      "id": "RAVU-RAVU_Zoom_AR_R2",
+      "name": "RAVU_Zoom_AR_R2",
+      "family": "RAVU",
+      "description": "RAVU-Zoom-AR (luma, r2, compute)",
+      "source": "RAVU/RAVU_Zoom_AR_R2.wgsl",
+      "tags": [
+        "RAVU"
+      ],
+      "passCount": 1,
+      "parameters": [],
+      "manifestVersion": 1,
+      "hash": "493724672889ce5a671e30b667ab1cf0f50bd50829c1712e63961316f304bcca",
+      "bytes": 609207,
+      "builtAt": "2026-11-10T20:50:09.574Z"
+    },
+    {
+      "kind": "wgx",
+      "path": "wgx/RAVU/RAVU_Zoom_AR_R2_RGB.wgx",
+      "id": "RAVU-RAVU_Zoom_AR_R2_RGB",
+      "name": "RAVU_Zoom_AR_R2_RGB",
+      "family": "RAVU",
+      "description": "RAVU-Zoom-AR (rgb, r2, compute)",
+      "source": "RAVU/RAVU_Zoom_AR_R2_RGB.wgsl",
+      "tags": [
+        "RAVU"
+      ],
+      "passCount": 1,
+      "parameters": [],
+      "manifestVersion": 1,
+      "hash": "9b880494f0a1cca962597fa3ce5cf62b374906db0458a325e2c968dea3bf9f95",
+      "bytes": 609341,
+      "builtAt": "2026-11-10T20:50:09.616Z"
+    },
+    {
+      "kind": "wgx",
+      "path": "wgx/RAVU/RAVU_Zoom_AR_R3.wgx",
+      "id": "RAVU-RAVU_Zoom_AR_R3",
+      "name": "RAVU_Zoom_AR_R3",
+      "family": "RAVU",
+      "description": "RAVU-Zoom-AR (luma, r3, compute)",
+      "source": "RAVU/RAVU_Zoom_AR_R3.wgsl",
+      "tags": [
+        "RAVU"
+      ],
+      "passCount": 1,
+      "parameters": [],
+      "manifestVersion": 1,
+      "hash": "2b435a224ed99265d35db5081b3d36ac0665669496f84d08d8786f05abbedfa1",
+      "bytes": 1069410,
+      "builtAt": "2026-11-10T20:50:09.746Z"
+    },
+    {
+      "kind": "wgx",
+      "path": "wgx/RAVU/RAVU_Zoom_AR_R3_RGB.wgx",
+      "id": "RAVU-RAVU_Zoom_AR_R3_RGB",
+      "name": "RAVU_Zoom_AR_R3_RGB",
+      "family": "RAVU",
+      "description": "RAVU-Zoom-AR (rgb, r3, compute)",
+      "source": "RAVU/RAVU_Zoom_AR_R3_RGB.wgsl",
+      "tags": [
+        "RAVU"
+      ],
+      "passCount": 1,
+      "parameters": [],
+      "manifestVersion": 1,
+      "hash": "8da8fbbdaf70d13811907c24141e209f67f84edbb94a22cdc6b7a411d630a880",
+      "bytes": 1069638,
+      "builtAt": "2026-11-10T20:50:09.875Z"
+    },
+    {
+      "kind": "wgx",
+      "path": "wgx/RAVU/RAVU_Zoom_R2.wgx",
+      "id": "RAVU-RAVU_Zoom_R2",
+      "name": "RAVU_Zoom_R2",
+      "family": "RAVU",
+      "description": "RAVU-Zoom (luma, r2, compute)",
+      "source": "RAVU/RAVU_Zoom_R2.wgsl",
+      "tags": [
+        "RAVU"
+      ],
+      "passCount": 1,
+      "parameters": [],
+      "manifestVersion": 1,
+      "hash": "01fc0f66928ec5a61de1f34b570dfa3c8f2bf2911f71bc70bef67cca2ca0bbbe",
+      "bytes": 344730,
+      "builtAt": "2026-11-10T20:50:09.889Z"
+    },
+    {
+      "kind": "wgx",
+      "path": "wgx/RAVU/RAVU_Zoom_R2_RGB.wgx",
+      "id": "RAVU-RAVU_Zoom_R2_RGB",
+      "name": "RAVU_Zoom_R2_RGB",
+      "family": "RAVU",
+      "description": "RAVU-Zoom (rgb, r2, compute)",
+      "source": "RAVU/RAVU_Zoom_R2_RGB.wgsl",
+      "tags": [
+        "RAVU"
+      ],
+      "passCount": 1,
+      "parameters": [],
+      "manifestVersion": 1,
+      "hash": "7b63cc25ba077257b707fa0f9512663ddf235d9bd78c8b669701d859b7b1be90",
+      "bytes": 344778,
+      "builtAt": "2026-11-10T20:50:09.902Z"
+    },
+    {
+      "kind": "wgx",
+      "path": "wgx/RAVU/RAVU_Zoom_R3.wgx",
+      "id": "RAVU-RAVU_Zoom_R3",
+      "name": "RAVU_Zoom_R3",
+      "family": "RAVU",
+      "description": "RAVU-Zoom (luma, r3, compute)",
+      "source": "RAVU/RAVU_Zoom_R3.wgsl",
+      "tags": [
+        "RAVU"
+      ],
+      "passCount": 1,
+      "parameters": [],
+      "manifestVersion": 1,
+      "hash": "f8246fcd97fb6085a041166978ea5ec804a876fd8a1b6a809dc3e6a7b56a5c00",
+      "bytes": 804895,
+      "builtAt": "2026-11-10T20:50:10.013Z"
+    },
+    {
+      "kind": "wgx",
+      "path": "wgx/RAVU/RAVU_Zoom_R3_RGB.wgx",
+      "id": "RAVU-RAVU_Zoom_R3_RGB",
+      "name": "RAVU_Zoom_R3_RGB",
+      "family": "RAVU",
+      "description": "RAVU-Zoom (rgb, r3, compute)",
+      "source": "RAVU/RAVU_Zoom_R3_RGB.wgsl",
+      "tags": [
+        "RAVU"
+      ],
+      "passCount": 1,
+      "parameters": [],
+      "manifestVersion": 1,
+      "hash": "c08a52d1b653f0e81305864aa05a7561a925a59b63fc124af8863ed39c470ba7",
+      "bytes": 805045,
+      "builtAt": "2026-11-10T20:50:10.120Z"
+    },
+    {
+      "kind": "wgx",
+      "path": "wgx/Scalers/Bicubic.wgx",
+      "id": "Scalers-Bicubic",
+      "name": "Bicubic",
+      "family": "Scalers",
+      "description": "Bicubic (Catmull-Rom family) resampling",
+      "source": "Scalers/Bicubic.wgsl",
+      "tags": [
+        "Scalers"
+      ],
+      "passCount": 1,
+      "parameters": [
+        {
+          "name": "paramB",
+          "type": "float",
+          "label": "B",
+          "default": 0.33,
+          "min": 0,
+          "max": 1,
+          "step": 0.01
+        },
+        {
+          "name": "paramC",
+          "type": "float",
+          "label": "C",
+          "default": 0.33,
+          "min": 0,
+          "max": 1,
+          "step": 0.01
+        }
+      ],
+      "manifestVersion": 1,
+      "hash": "e5e01deeaa9dc4580b2e8136cb79172742bc14a0fca47242db9bb9e30d0c11a8",
+      "bytes": 2477,
+      "builtAt": "2026-11-10T20:50:10.185Z"
+    },
+    {
+      "kind": "wgx",
+      "path": "wgx/Scalers/Bilinear.wgx",
+      "id": "Scalers-Bilinear",
+      "name": "Bilinear",
+      "family": "Scalers",
+      "description": "Bilinear scaler (LINEAR + CLAMP)",
+      "source": "Scalers/Bilinear.wgsl",
+      "tags": [
+        "Scalers"
+      ],
+      "passCount": 1,
+      "parameters": [],
+      "manifestVersion": 1,
+      "hash": "6d614340a0e66718f9c6b0a7e172659e05167833f4a76830a753bc0a19cacb30",
+      "bytes": 1539,
+      "builtAt": "2026-11-10T20:50:10.187Z"
+    },
+    {
+      "kind": "wgx",
+      "path": "wgx/Scalers/Jinc.wgx",
+      "id": "Scalers-Jinc",
+      "name": "Jinc",
+      "family": "Scalers",
+      "description": "Jinc2 resampling + anti-ringing",
+      "source": "Scalers/Jinc.wgsl",
+      "tags": [
+        "Scalers"
+      ],
+      "passCount": 1,
+      "parameters": [
+        {
+          "name": "windowSinc",
+          "type": "float",
+          "label": "Window Sinc Param",
+          "default": 0.5,
+          "min": 0,
+          "max": 1,
+          "step": 0.01
+        },
+        {
+          "name": "sinc",
+          "type": "float",
+          "label": "Sinc Param",
+          "default": 0.825,
+          "min": 0,
+          "max": 1,
+          "step": 0.01
+        },
+        {
+          "name": "ARStrength",
+          "type": "float",
+          "label": "Anti-ringing Strength",
+          "default": 0.5,
+          "min": 0,
+          "max": 1,
+          "step": 0.1
+        }
+      ],
+      "manifestVersion": 1,
+      "hash": "7bf2d28d091b2709a92ae83b9aa81a7710c56a74b98c948680f29e7df6d22297",
+      "bytes": 3160,
+      "builtAt": "2026-11-10T20:50:10.188Z"
+    },
+    {
+      "kind": "wgx",
+      "path": "wgx/Scalers/Lanczos.wgx",
+      "id": "Scalers-Lanczos",
+      "name": "Lanczos",
+      "family": "Scalers",
+      "description": "Lanczos6 resampling + anti-ringing",
+      "source": "Scalers/Lanczos.wgsl",
+      "tags": [
+        "Scalers"
+      ],
+      "passCount": 1,
+      "parameters": [
+        {
+          "name": "ARStrength",
+          "type": "float",
+          "label": "Anti-ringing Strength",
+          "default": 0.5,
+          "min": 0,
+          "max": 1,
+          "step": 0.01
+        }
+      ],
+      "manifestVersion": 1,
+      "hash": "8b813a2e5f51b9f8ae114dac21a41f259b4ddb43b29a6b6f47670aabcbc3e4b5",
+      "bytes": 2538,
+      "builtAt": "2026-11-10T20:50:10.189Z"
+    },
+    {
+      "kind": "wgx",
+      "path": "wgx/Scalers/Nearest.wgx",
+      "id": "Scalers-Nearest",
+      "name": "Nearest",
+      "family": "Scalers",
+      "description": "Nearest-neighbour scaler (POINT + CLAMP)",
+      "source": "Scalers/Nearest.wgsl",
+      "tags": [
+        "Scalers"
+      ],
+      "passCount": 1,
+      "parameters": [],
+      "manifestVersion": 1,
+      "hash": "abb82bed3faa8a218e2298607cc2b8b2de31e03e8f8970521fdb2b4488cbb292",
+      "bytes": 1543,
+      "builtAt": "2026-11-10T20:50:10.191Z"
+    },
+    {
+      "kind": "wgx",
+      "path": "wgx/Scalers/SSimDownscaler.wgx",
+      "id": "Scalers-SSimDownscaler",
+      "name": "SSimDownscaler",
+      "family": "Scalers",
+      "description": "Catmull-Rom 預濾波（9 取樣模擬 4x4）",
+      "source": "Scalers/SSimDownscaler.wgsl",
+      "tags": [
+        "Scalers"
+      ],
+      "passCount": 5,
+      "parameters": [
+        {
+          "name": "oversharp",
+          "type": "float",
+          "label": "Oversharp",
+          "default": 1,
+          "min": 1,
+          "max": 3,
+          "step": 0.1
+        }
+      ],
+      "manifestVersion": 1,
+      "hash": "dd3fd1853aa4ed70168374f6a7b1c01e34a4b32cc29fae801282c7ed75d5f915",
+      "bytes": 8840,
+      "builtAt": "2026-11-10T20:50:10.193Z"
+    },
+    {
+      "kind": "wgx",
+      "path": "wgx/Sharpen/AdaptiveSharpen.wgx",
+      "id": "Sharpen-AdaptiveSharpen",
+      "name": "AdaptiveSharpen",
+      "family": "Sharpen",
+      "description": "Adaptive sharpen (2015-05-15)",
+      "source": "Sharpen/AdaptiveSharpen.wgsl",
+      "tags": [
+        "Sharpen"
+      ],
+      "passCount": 1,
+      "parameters": [
+        {
+          "name": "curveHeight",
+          "type": "float",
+          "label": "Sharpness",
+          "default": 0.8,
+          "min": 0,
+          "max": 2,
+          "step": 0.01
+        }
+      ],
+      "manifestVersion": 1,
+      "hash": "f83879ae72a5c15900bc69c3c2058e03d6b6b13f5727c1cf9a8935780b49018a",
+      "bytes": 3941,
+      "builtAt": "2026-11-10T20:50:10.195Z"
+    },
+    {
+      "kind": "wgx",
+      "path": "wgx/Sharpen/FineSharp.wgx",
+      "id": "Sharpen-FineSharp",
+      "name": "FineSharp",
+      "family": "Sharpen",
+      "description": "RemoveGrain11：RGB→YUV（SD/HD 矩陣）+ Y 高斯平滑",
+      "source": "Sharpen/FineSharp.wgsl",
+      "tags": [
+        "Sharpen"
+      ],
+      "passCount": 5,
+      "parameters": [
+        {
+          "name": "sstr",
+          "type": "float",
+          "label": "Sharpness",
+          "default": 2,
+          "min": 0,
+          "max": 8,
+          "step": 0.01
+        },
+        {
+          "name": "cstr",
+          "type": "float",
+          "label": "Equalisation",
+          "default": 0.9,
+          "min": 0,
+          "max": 2,
+          "step": 0.01
+        },
+        {
+          "name": "xstr",
+          "type": "float",
+          "label": "XSharpen",
+          "default": 0.19,
+          "min": 0,
+          "max": 1,
+          "step": 0.01
+        },
+        {
+          "name": "xrep",
+          "type": "float",
+          "label": "Repair",
+          "default": 0.25,
+          "min": 0,
+          "max": 1,
+          "step": 0.01
+        }
+      ],
+      "manifestVersion": 1,
+      "hash": "94c4bd33d3f89efbe177542fc279fdcd9e6f423f4bf0e70176d7998dd132d3a6",
+      "bytes": 7742,
+      "builtAt": "2026-11-10T20:50:10.198Z"
+    },
+    {
+      "kind": "wgx",
+      "path": "wgx/Sharpen/LCAS.wgx",
+      "id": "Sharpen-LCAS",
+      "name": "LCAS",
+      "family": "Sharpen",
+      "description": "LCAS: linear interpolation + light CAS sharpen",
+      "source": "Sharpen/LCAS.wgsl",
+      "tags": [
+        "Sharpen"
+      ],
+      "passCount": 1,
+      "parameters": [
+        {
+          "name": "sharpness",
+          "type": "float",
+          "label": "Sharpness",
+          "default": 0.5,
+          "min": 0,
+          "max": 1,
+          "step": 0.01
+        }
+      ],
+      "manifestVersion": 1,
+      "hash": "14a6c14bbfeb36a958529eca526259741451024f1281f0eb30fa7bc9a0746ce2",
+      "bytes": 2402,
+      "builtAt": "2026-11-10T20:50:10.200Z"
+    },
+    {
+      "kind": "wgx",
+      "path": "wgx/Sharpen/LumaSharpen.wgx",
+      "id": "Sharpen-LumaSharpen",
+      "name": "LumaSharpen",
+      "family": "Sharpen",
+      "description": "Luma sharpen (4 sampling patterns, luma-only, halo clamp)",
+      "source": "Sharpen/LumaSharpen.wgsl",
+      "tags": [
+        "Sharpen"
+      ],
+      "passCount": 1,
+      "parameters": [
+        {
+          "name": "sharpStrength",
+          "type": "float",
+          "label": "Sharpening Strength",
+          "default": 0.65,
+          "min": 0,
+          "max": 3,
+          "step": 0.01
+        },
+        {
+          "name": "sharpClamp",
+          "type": "float",
+          "label": "Sharpening Limit",
+          "default": 0.035,
+          "min": 0,
+          "max": 1,
+          "step": 0.005
+        },
+        {
+          "name": "pattern",
+          "type": "int",
+          "label": "Sample Pattern",
+          "default": 1,
+          "min": 0,
+          "max": 3,
+          "step": 1
+        },
+        {
+          "name": "offsetBias",
+          "type": "float",
+          "label": "Offset Bias",
+          "default": 1,
+          "min": 0,
+          "max": 6,
+          "step": 0.01
+        }
+      ],
+      "manifestVersion": 1,
+      "hash": "32f0e0a2272ab423b8423ef46b1dd94b920750ece537fbe844f834f8fb966301",
+      "bytes": 3286,
+      "builtAt": "2026-11-10T20:50:10.201Z"
+    },
+    {
+      "kind": "wgx",
+      "path": "wgx/SMAA/SMAA_Low.wgx",
+      "id": "SMAA-SMAA_Low",
+      "name": "SMAA_0",
+      "family": "SMAA",
+      "description": "SMAA luma edge detection",
+      "source": "SMAA/SMAA_Low.wgsl",
+      "tags": [
+        "SMAA"
+      ],
+      "passCount": 3,
+      "parameters": [],
+      "manifestVersion": 1,
+      "hash": "82fe94a379c6c004c302f45218bd5281b4bf32a597631f547e931638bf425c6e",
+      "bytes": 63386,
+      "builtAt": "2026-11-10T20:50:10.153Z"
+    },
+    {
+      "kind": "wgx",
+      "path": "wgx/SMAA/SMAA_Medium.wgx",
+      "id": "SMAA-SMAA_Medium",
+      "name": "SMAA_1",
+      "family": "SMAA",
+      "description": "SMAA luma edge detection",
+      "source": "SMAA/SMAA_Medium.wgsl",
+      "tags": [
+        "SMAA"
+      ],
+      "passCount": 3,
+      "parameters": [],
+      "manifestVersion": 1,
+      "hash": "2e2c07c06174ff5dfeb5dab4e770b669e6b967a7ab135d561f2abe938adf2363",
+      "bytes": 63392,
+      "builtAt": "2026-11-10T20:50:10.168Z"
+    },
+    {
+      "kind": "wgx",
+      "path": "wgx/SMAA/SMAA_High.wgx",
+      "id": "SMAA-SMAA_High",
+      "name": "SMAA_2",
+      "family": "SMAA",
+      "description": "SMAA luma edge detection",
+      "source": "SMAA/SMAA_High.wgsl",
+      "tags": [
+        "SMAA"
+      ],
+      "passCount": 3,
+      "parameters": [],
+      "manifestVersion": 1,
+      "hash": "6cf6e055a52c797f0943aa85540c4d6a74f6eb64323d4083aa9aaa3b3f587898",
+      "bytes": 65372,
+      "builtAt": "2026-11-10T20:50:10.137Z"
+    },
+    {
+      "kind": "wgx",
+      "path": "wgx/SMAA/SMAA_Ultra.wgx",
+      "id": "SMAA-SMAA_Ultra",
+      "name": "SMAA_3",
+      "family": "SMAA",
+      "description": "SMAA luma edge detection",
+      "source": "SMAA/SMAA_Ultra.wgsl",
+      "tags": [
+        "SMAA"
+      ],
+      "passCount": 3,
+      "parameters": [],
+      "manifestVersion": 1,
+      "hash": "b1123ca1284737a0a9f173e1f4d724af327b7e6ee7fa03474927346e45660006",
+      "bytes": 65379,
+      "builtAt": "2026-11-10T20:50:10.184Z"
+    },
+    {
+      "kind": "wgx",
+      "path": "wgx/xBRZ/xBRZ_2x.wgx",
+      "id": "xBRZ-xBRZ_2x",
+      "name": "xBRZ_2x",
+      "family": "xBRZ",
+      "description": "xBRZ 2x — high quality pixel art upscaler",
+      "source": "xBRZ/xBRZ_2x.wgsl",
+      "tags": [
+        "xBRZ"
+      ],
+      "passCount": 1,
+      "parameters": [],
+      "manifestVersion": 1,
+      "hash": "0b9edf68f37d915c5b82bdf0b11a01b4dc1f1bce90ed90200d4f6951c787a238",
+      "bytes": 3989,
+      "builtAt": "2026-11-10T20:50:10.204Z"
+    },
+    {
+      "kind": "wgx",
+      "path": "wgx/xBRZ/xBRZ_3x.wgx",
+      "id": "xBRZ-xBRZ_3x",
+      "name": "xBRZ_3x",
+      "family": "xBRZ",
+      "description": "xBRZ 3x — high quality pixel art upscaler",
+      "source": "xBRZ/xBRZ_3x.wgsl",
+      "tags": [
+        "xBRZ"
+      ],
+      "passCount": 1,
+      "parameters": [],
+      "manifestVersion": 1,
+      "hash": "c95e87a1ab5d7b7dbaf7764bc31e91879ba1c8351f266257e1a055af489009c9",
+      "bytes": 4144,
+      "builtAt": "2026-11-10T20:50:10.206Z"
+    },
+    {
+      "kind": "wgx",
+      "path": "wgx/xBRZ/xBRZ_4x.wgx",
+      "id": "xBRZ-xBRZ_4x",
+      "name": "xBRZ_4x",
+      "family": "xBRZ",
+      "description": "xBRZ 4x — high quality pixel art upscaler",
+      "source": "xBRZ/xBRZ_4x.wgsl",
+      "tags": [
+        "xBRZ"
+      ],
+      "passCount": 1,
+      "parameters": [],
+      "manifestVersion": 1,
+      "hash": "b31e43ff03497ab5cd42b9bc7a6571da1c23dc05b14e9d8d45dfabcc58d539e0",
+      "bytes": 4259,
+      "builtAt": "2026-11-10T20:50:10.209Z"
+    },
+    {
+      "kind": "wgx",
+      "path": "wgx/xBRZ/xBRZ_5x.wgx",
+      "id": "xBRZ-xBRZ_5x",
+      "name": "xBRZ_5x",
+      "family": "xBRZ",
+      "description": "xBRZ 5x — high quality pixel art upscaler",
+      "source": "xBRZ/xBRZ_5x.wgsl",
+      "tags": [
+        "xBRZ"
+      ],
+      "passCount": 1,
+      "parameters": [],
+      "manifestVersion": 1,
+      "hash": "aa50c2779e45c3422e6ecdfc42c2873739036148f55bceaddb262a6717730c13",
+      "bytes": 4428,
+      "builtAt": "2026-11-10T20:50:10.211Z"
+    },
+    {
+      "kind": "wgx",
+      "path": "wgx/xBRZ/xBRZ_6x.wgx",
+      "id": "xBRZ-xBRZ_6x",
+      "name": "xBRZ_6x",
+      "family": "xBRZ",
+      "description": "xBRZ 6x — high quality pixel art upscaler",
+      "source": "xBRZ/xBRZ_6x.wgsl",
+      "tags": [
+        "xBRZ"
+      ],
+      "passCount": 1,
+      "parameters": [],
+      "manifestVersion": 1,
+      "hash": "51584caf27c8b5c6823fdac7c0b0f91d5eeaeb704f399e02c826dcd3390f14de",
+      "bytes": 4683,
+      "builtAt": "2026-11-10T20:50:10.214Z"
+    },
+    {
+      "kind": "wgx",
+      "path": "wgx/xBRZ/xBRZ_Freescale.wgx",
+      "id": "xBRZ-xBRZ_Freescale",
+      "name": "xBRZ_Freescale",
+      "family": "xBRZ",
+      "description": "xBRZ free-scale — pass 1: per-pixel blend classification",
+      "source": "xBRZ/xBRZ_Freescale.wgsl",
+      "tags": [
+        "xBRZ"
+      ],
+      "passCount": 2,
+      "parameters": [],
+      "manifestVersion": 1,
+      "hash": "4e4e4d20743411f04777bc9c38580ef9c5c25245d52e92518c84f92c2bcc0105",
+      "bytes": 5651,
+      "builtAt": "2026-11-10T20:50:10.216Z"
+    }
+  ],
+  "legacy": [
+    {
+      "kind": "wgsl",
+      "path": "effects_wgsl/AdaptiveSharpen.wgsl",
+      "id": "wgsl:effects_wgsl/AdaptiveSharpen.wgsl",
+      "name": "AdaptiveSharpen",
+      "family": "effects_wgsl",
+      "description": "",
+      "parameters": null,
+      "hash": "869cc850b8f6b224f23e0315409ac8f960139eeac30074df5e2588138b3456f4",
+      "bytes": 7444
+    },
+    {
+      "kind": "wgsl",
+      "path": "effects_wgsl/Anime4K/Anime4K_Denoise_Bilateral_Mode.wgsl",
+      "id": "wgsl:effects_wgsl/Anime4K/Anime4K_Denoise_Bilateral_Mode.wgsl",
+      "name": "Anime4K_Denoise_Bilateral_Mode",
+      "family": "Anime4K",
+      "description": "",
+      "parameters": null,
+      "hash": "b540e2548648f656c0b02c47b73e01d2a3ea09c879916741bb3e27897518a52b",
+      "bytes": 7712
+    },
+    {
+      "kind": "wgsl",
+      "path": "effects_wgsl/Anime4K/Anime4K_Restore_Soft_UL.wgsl",
+      "id": "wgsl:effects_wgsl/Anime4K/Anime4K_Restore_Soft_UL.wgsl",
+      "name": "Anime4K_Restore_Soft_UL",
+      "family": "Anime4K",
+      "description": "",
+      "parameters": null,
+      "hash": "2e123863688a953ac8e8d35476a8dbce5184692d0c76ff19e3c6390571e018a8",
+      "bytes": 337814
+    },
+    {
+      "kind": "wgsl",
+      "path": "effects_wgsl/Anime4K/Anime4K_Upscale_Denoise_S.wgsl",
+      "id": "wgsl:effects_wgsl/Anime4K/Anime4K_Upscale_Denoise_S.wgsl",
+      "name": "Anime4K_Upscale_Denoise_S",
+      "family": "Anime4K",
+      "description": "",
+      "parameters": null,
+      "hash": "d22c491c6d32addf20f583cb3e05087ca983f239a4906e350c648fef94e90dd1",
+      "bytes": 26272
+    },
+    {
+      "kind": "wgsl",
+      "path": "effects_wgsl/Bicubic.wgsl",
+      "id": "wgsl:effects_wgsl/Bicubic.wgsl",
+      "name": "Bicubic",
+      "family": "effects_wgsl",
+      "description": "",
+      "parameters": null,
+      "hash": "5e6e13b5ca70391c6c771fd9b8d15477afeee2370089fcee14203d91bc9772dd",
+      "bytes": 3591
+    },
+    {
+      "kind": "wgsl",
+      "path": "effects_wgsl/Bilinear.wgsl",
+      "id": "wgsl:effects_wgsl/Bilinear.wgsl",
+      "name": "Bilinear",
+      "family": "effects_wgsl",
+      "description": "",
+      "parameters": null,
+      "hash": "20b9e798fc63642ee681ec7b013f84f38332f94115fff5dc75f557722aba9adb",
+      "bytes": 729
+    },
+    {
+      "kind": "wgsl",
+      "path": "effects_wgsl/CAS.wgsl",
+      "id": "wgsl:effects_wgsl/CAS.wgsl",
+      "name": "CAS",
+      "family": "effects_wgsl",
+      "description": "",
+      "parameters": null,
+      "hash": "0383d37fcda43cb45e869e69771fd6aa9dae10941d5fa64af43a6c0a37eab110",
+      "bytes": 2989
+    },
+    {
+      "kind": "wgsl",
+      "path": "effects_wgsl/Deband.wgsl",
+      "id": "wgsl:effects_wgsl/Deband.wgsl",
+      "name": "Deband",
+      "family": "effects_wgsl",
+      "description": "",
+      "parameters": null,
+      "hash": "b91ece738acb7fbac1dfcca76dcaec763ee65e585c6b359212fb92157596908a",
+      "bytes": 3724
+    },
+    {
+      "kind": "wgsl",
+      "path": "effects_wgsl/FineSharp.wgsl",
+      "id": "wgsl:effects_wgsl/FineSharp.wgsl",
+      "name": "FineSharp",
+      "family": "effects_wgsl",
+      "description": "",
+      "parameters": null,
+      "hash": "f6ca911bafef2dff0b261c493faf9c7dc6ea8474950ab74294aab5ed9a6150b9",
+      "bytes": 12720
+    },
+    {
+      "kind": "wgsl",
+      "path": "effects_wgsl/FXAA_High.wgsl",
+      "id": "wgsl:effects_wgsl/FXAA_High.wgsl",
+      "name": "FXAA_High",
+      "family": "effects_wgsl",
+      "description": "",
+      "parameters": null,
+      "hash": "a7d2fd0a0f041c7619adaec9863f44d516b37c6b75424f02562c1437104d9ad1",
+      "bytes": 6127
+    },
+    {
+      "kind": "wgsl",
+      "path": "effects_wgsl/FXAA_Medium.wgsl",
+      "id": "wgsl:effects_wgsl/FXAA_Medium.wgsl",
+      "name": "FXAA_Medium",
+      "family": "effects_wgsl",
+      "description": "",
+      "parameters": null,
+      "hash": "97cac4afc9b6a5f44bf333e2c096b0261085dc8dfeb0ed345eaf8d662d1b6d99",
+      "bytes": 6131
+    },
+    {
+      "kind": "wgsl",
+      "path": "effects_wgsl/FXAA_Ultra.wgsl",
+      "id": "wgsl:effects_wgsl/FXAA_Ultra.wgsl",
+      "name": "FXAA_Ultra",
+      "family": "effects_wgsl",
+      "description": "",
+      "parameters": null,
+      "hash": "623aecece109a245d7e761d789d88dcc34e1ed05aeade5cb6da32d4ec937b27c",
+      "bytes": 6129
+    },
+    {
+      "kind": "wgsl",
+      "path": "effects_wgsl/ImageAdjustment.wgsl",
+      "id": "wgsl:effects_wgsl/ImageAdjustment.wgsl",
+      "name": "ImageAdjustment",
+      "family": "effects_wgsl",
+      "description": "",
+      "parameters": null,
+      "hash": "87782d3c205dbb15dab2eb32cb0dfd3295bc660bb261c6f681d5933d8a027916",
+      "bytes": 3210
+    },
+    {
+      "kind": "wgsl",
+      "path": "effects_wgsl/Jinc.wgsl",
+      "id": "wgsl:effects_wgsl/Jinc.wgsl",
+      "name": "Jinc",
+      "family": "effects_wgsl",
+      "description": "",
+      "parameters": null,
+      "hash": "891deda00254769816e1921cdc1d3f709c4ac665e9a4249af4a092bf8489c90c",
+      "bytes": 4170
+    },
+    {
+      "kind": "wgsl",
+      "path": "effects_wgsl/Lanczos.wgsl",
+      "id": "wgsl:effects_wgsl/Lanczos.wgsl",
+      "name": "Lanczos",
+      "family": "effects_wgsl",
+      "description": "",
+      "parameters": null,
+      "hash": "5ea0d741bb5f7ed21b75d11874158011fd1743ad565e467ebf20328ed5fb129f",
+      "bytes": 3750
+    },
+    {
+      "kind": "wgsl",
+      "path": "effects_wgsl/LCAS.wgsl",
+      "id": "wgsl:effects_wgsl/LCAS.wgsl",
+      "name": "LCAS",
+      "family": "effects_wgsl",
+      "description": "",
+      "parameters": null,
+      "hash": "8afacd6fa0155b8ca901856bca3b991f59063e72beac0024c18d01dcc5f81fd5",
+      "bytes": 3164
+    },
+    {
+      "kind": "wgsl",
+      "path": "effects_wgsl/LumaSharpen.wgsl",
+      "id": "wgsl:effects_wgsl/LumaSharpen.wgsl",
+      "name": "LumaSharpen",
+      "family": "effects_wgsl",
+      "description": "",
+      "parameters": null,
+      "hash": "d5d6dea2dd923f956a075ddbf4effeb1325b1513ebd0193b50694be52436115d",
+      "bytes": 4661
+    },
+    {
+      "kind": "wgsl",
+      "path": "effects_wgsl/Nearest.wgsl",
+      "id": "wgsl:effects_wgsl/Nearest.wgsl",
+      "name": "Nearest",
+      "family": "effects_wgsl",
+      "description": "",
+      "parameters": null,
+      "hash": "0653f1fce93445b3fa8fdd04feba6da9e4751c0144b78ac11ad5ffb3697c7843",
+      "bytes": 726
+    },
+    {
+      "kind": "wgsl",
+      "path": "effects_wgsl/sharpen.wgsl",
+      "id": "wgsl:effects_wgsl/sharpen.wgsl",
+      "name": "sharpen",
+      "family": "effects_wgsl",
+      "description": "",
+      "parameters": null,
+      "hash": "1837661ab47af0c3623f5ce91f25a4ab6b1b861a20e3f3261180fe95cb0cdb34",
+      "bytes": 2944
+    },
+    {
+      "kind": "wgsl",
+      "path": "effects_wgsl/SSimDownscaler.wgsl",
+      "id": "wgsl:effects_wgsl/SSimDownscaler.wgsl",
+      "name": "SSimDownscaler",
+      "family": "effects_wgsl",
+      "description": "",
+      "parameters": null,
+      "hash": "0577c22f44beba88e38191dfba194990f233aac00851eb1d8d2b89640eb8a770",
+      "bytes": 11612
+    }
+  ]
+}
