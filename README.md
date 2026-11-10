@@ -94,6 +94,9 @@ The parser scans a shader file for special comment lines starting with `//!`. Th
 
 This directory is intended for shaders written in WGSL (WebGPU Shading Language). It signifies an experimental or future-proofed part of the project, allowing it to leverage the newer WebGPU API for potentially better performance.
 
+It is the **legacy** effect path: effects are preferably shipped as pre-compiled `.wgx` packages
+(see below). Existing `.wgsl` files keep working and stay listed in the library.
+
 ### WGFX Core Library (ESM dependency)
 
 The core engine is the separate [WGFX](https://github.com/sinchichou/WGFX) package — it is **no longer copied in by hand**.
@@ -109,6 +112,51 @@ npm run check:wgfx   # CI: fails if vendor/ is out of date
   `vendor/.wgfx-sync.json`.
 - `content.js` imports it as ESM: `await import(chrome.runtime.getURL('vendor/wgfx.browser.esm.js'))`.
 - `vendor/` is generated and git-ignored — **never edit it by hand**.
+
+### Pre-compiled effect packages (`.wgx`)
+
+Effects are shipped as **pre-compiled packages** produced by the WGFX project's `npm run pack`.
+A `.wgx` is a zip containing the pre-generated WGSL of every pass, the external textures (LUTs)
+and a `manifest.json` with the effect's metadata — so the extension no longer has to parse
+`.wgsl` at runtime.
+
+```bash
+npm run sync:wgfx    # vendor vendor/wgfx.browser.esm.js AND wgx/ (packages + index)
+npm run check:wgfx   # CI: fails if vendor/ or wgx/ is out of date
+node scripts/verify-popup.mjs   # programmatic check of the library/background/popup DOM
+```
+
+- Packages are copied to `wgx/<family>/<effect>.wgx`. The sync is idempotent (identical content
+  is never rewritten) and deletes packages that vanished from the source; manually added
+  packages are left alone. `--force` rewrites anyway, `--soft` only warns (used by
+  `postinstall`). Set `WGFX_PACKAGES=<dir containing .wgx>` to sync from somewhere else.
+- `scripts/sync-wgfx.mjs` also writes **`wgx/packages.json`**, an index carrying each package's
+  `path / id / name / family / description / parameters` plus the list of legacy `.wgsl`
+  effects. Why an index instead of scanning: an MV3 service worker **cannot enumerate**
+  extension files (there is no directory API, only `chrome.runtime.getURL` for a known path).
+  Generating the index at sync time means the library can never drift from the files on disk —
+  the old hard-coded list of 6 paths was already stale (one of them did not even exist).
+- `background.js` reads that index to answer `getShaderFiles`; `popup.js` renders it grouped by
+  family and stores one entry per pipeline item: `{ kind, path, id, name, family, params }`.
+  Parameters of a package come from the index, so the UI never unzips anything.
+- `manifest.json` exposes `wgx/**/*.wgx` as web-accessible resources so the content script can
+  `fetch(chrome.runtime.getURL('wgx/…'))` from the page. The MV3 default CSP is preserved
+  (no `unsafe-eval`).
+
+#### Adding an effect
+
+1. In the **WGFX** project: add `effects/<Family>/<Name>.wgsl`, then run `npm run pack`.
+2. Here: run `npm run sync:wgfx` — the package is copied to `wgx/<Family>/` and the index is
+   updated (the sync script extracts the metadata straight from the package manifest).
+3. Reload the extension. The effect shows up in the popup library, grouped by family with its
+   pass count / parameter count / description, and can be added to the pipeline.
+
+#### Relation to the WGFX core
+
+Two halves of the same engine: `vendor/wgfx.browser.esm.js` is the runtime (it exports the
+package runtime — `WGFXPackage`, `WGFXPackageInstance` — next to `WGFX`/`WGFXRuntime`), while
+`wgx/*.wgx` are the content it runs. `content.js` turns a pipeline entry's `path` into a package
+instance; the popup only ever reads `wgx/packages.json`.
 
 ---
 
@@ -202,6 +250,9 @@ npm run check:wgfx   # CI: fails if vendor/ is out of date
 
 此目錄用於存放以 WGSL（WebGPU Shading Language）編寫的著色器。它代表了專案中實驗性或為未來做準備的部分，使其能夠利用更新的 WebGPU API 以獲得潛在的更佳效能。
 
+這是**legacy** 效果路徑:效果現在建議以預編套件包 `.wgx` 供應(見下文)。既有的 `.wgsl`
+仍可運作,也會繼續出現在效果庫清單中。
+
 ### WGFX 核心庫（ESM 相依）
 
 核心引擎是獨立的 [WGFX](https://github.com/sinchichou/WGFX) 套件——**已不再手動複製檔案進本專案**。
@@ -216,6 +267,46 @@ npm run check:wgfx   # CI 用：若 vendor/ 與來源不同步則失敗
   （找不到套件時退回同層的 `../WGFX/dist`），並將來源版本與雜湊記錄於 `vendor/.wgfx-sync.json`。
 - `content.js` 以 ESM 匯入：`await import(chrome.runtime.getURL('vendor/wgfx.browser.esm.js'))`。
 - `vendor/` 是產生物且已列入 gitignore——**請勿手動編輯**。
+
+### 預編效果套件包（`.wgx`）
+
+效果改以 **預編套件包**供應,由 WGFX 專案的 `npm run pack` 產生。`.wgx` 是一個 zip,內含每個
+pass 的預生成 WGSL、外部紋理(LUT)與一份描述效果中繼資料的 `manifest.json`——擴充套件不再
+需要在執行期解析 `.wgsl`。
+
+```bash
+npm run sync:wgfx    # 攤銷 vendor/wgfx.browser.esm.js 與 wgx/(套件包 + 索引)
+npm run check:wgfx   # CI 用:vendor/ 或 wgx/ 過期即失敗
+node scripts/verify-popup.mjs   # 以程式化方式驗證效果庫/background/popup 的 DOM 產出
+```
+
+- 套件包會被複製到 `wgx/<家族>/<效果>.wgx`。同步是冪等的(內容相同不重寫),並會刪除來源已
+  移除的套件包;手動放入的套件包不會被動到。`--force` 強制重寫,`--soft` 只警告(供
+  `postinstall` 使用)。可用 `WGFX_PACKAGES=<含 .wgx 的目錄>` 指定其他來源。
+- `scripts/sync-wgfx.mjs` 也會產生 **`wgx/packages.json`**:內含每個套件包的
+  `path / id / name / family / description / parameters`,以及 legacy `.wgsl` 效果清單。
+  為什麼要索引而不用掃描:MV3 的 service worker **無法列舉**擴充套件內的檔案(沒有目錄
+  API,只有已知路徑的 `chrome.runtime.getURL`)。索引在同步當下產生,因此清單永遠與磁碟上
+  的檔案一致——舊版硬編碼的 6 條路徑早已過時(其中一條甚至不存在)。
+- `background.js` 讀這份索引來回應 `getShaderFiles`;`popup.js` 依 family 分組呈現,並為每個
+  管線項目儲存 `{ kind, path, id, name, family, params }`。套件包的參數來自索引,UI 完全不
+  需要解壓。
+- `manifest.json` 把 `wgx/**/*.wgx` 列為 web accessible resource,讓內容腳本能在頁面中
+  `fetch(chrome.runtime.getURL('wgx/…'))`。維持 MV3 預設 CSP(沒有 `unsafe-eval`)。
+
+#### 如何新增效果
+
+1. 在 **WGFX** 專案:新增 `effects/<家族>/<名稱>.wgsl`,執行 `npm run pack`。
+2. 在本專案:執行 `npm run sync:wgfx` —— 套件包會被複製到 `wgx/<家族>/` 並更新索引
+   (同步腳本直接從套件包的 manifest 抽出中繼資料)。
+3. 重新載入擴充功能。效果會出現在 popup 效果庫中(依家族分組,附 pass 數/參數數/描述),
+   並可加入管線。
+
+#### 與 WGFX 核心的關係
+
+同一個引擎的兩半:`vendor/wgfx.browser.esm.js` 是執行期(除了 `WGFX`/`WGFXRuntime`,也匯出
+套件執行期 `WGFXPackage`、`WGFXPackageInstance`),而 `wgx/*.wgx` 是它執行的內容。
+`content.js` 把管線項目的 `path` 變成套件實例;popup 只讀 `wgx/packages.json`。
 
 ### 展示
 

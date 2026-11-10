@@ -474,11 +474,22 @@ document.addEventListener('DOMContentLoaded', () => {
     }
 
     /**
-     * legacy `.wgsl`:抓檔並解析 `//!PARAMETER`(轉成與 .wgx 相同的 defs 形狀)。
-     * legacy 由檔案本身的 codegen 註解提供 min/max/step/default。
+     * legacy `.wgsl`:抓檔並解析參數(轉成與 .wgx 相同的 defs 形狀)。
+     *
+     * 兩種世代的檔案格式都要支援 / Two generations of files:
+     *   1. Magpie 風格指令區塊(本 repo `effects_wgsl/*.wgsl` 目前全部是這種):
+     *        //! PARAMETER sharpness      (或 `//!PARAMETER` + `//!VAR sharpness`)
+     *        //! LABEL "Sharpness"
+     *        //! MIN 0 / MAX 1 / DEFAULT 0.4 / STEP 0.01
+     *        float sharpness;
+     *   2. 舊版 codegen 的 `var<uniform> ... struct` + `// ui_min=` 註解 → parseUniforms()。
      */
     async function readLegacyParamDefs(path) {
         const code = await loadShaderCode(path);
+        const direct = parseParamDirectives(code);
+        if (direct.length > 0) return direct;
+
+        // 退回 struct 形式(舊版產物)
         const { uniforms } = parseUniforms(code);
         return Object.values(uniforms.properties).map(prop => ({
             name: prop.name,
@@ -489,6 +500,68 @@ document.addEventListener('DOMContentLoaded', () => {
             max: prop.max,
             step: prop.step,
         }));
+    }
+
+    /** 指令區塊解析:`//! PARAMETER …` + LABEL/TYPE/MIN/MAX/DEFAULT/STEP(/VAR) */
+    function parseParamDirectives(shaderCode) {
+        const BLOCK_STARTS = new Set(['TEXTURE', 'SAMPLER', 'PASS', 'BUFFER', 'COMMON', 'END']);
+        const defs = [];
+        let cur = null;
+
+        for (const rawLine of String(shaderCode).split(/\r?\n/)) {
+            const line = rawLine.trim();
+            const dir = /^\/\/!\s*([A-Za-z_]+)\s*(.*)$/.exec(line);
+
+            if (!dir) {
+                if (!cur) continue;
+                if (line === '') continue; // 允許宣告前有空行
+                // 非指令行 = 宣告行:名稱若還沒拿到,從 `float name;` 取得
+                if (!cur.name) {
+                    const decl = /(?:float|f32|int|i32|uint|u32|bool)\s+([A-Za-z_]\w*)/.exec(line);
+                    if (decl) cur.name = decl[1];
+                }
+                if (cur.name) defs.push(finalizeParamDef(cur));
+                cur = null;
+                continue;
+            }
+
+            const key = dir[1].toUpperCase();
+            const val = dir[2].trim().replace(/^"|"$/g, '');
+
+            if (key === 'PARAMETER') {
+                if (cur && cur.name) defs.push(finalizeParamDef(cur));
+                cur = { name: val || '', label: '', type: 'float' };
+                continue;
+            }
+            if (!cur) continue;
+            if (BLOCK_STARTS.has(key)) {
+                // 區塊沒有宣告行就結束了(格式不符預期)→ 丟棄該區塊
+                cur = null;
+                continue;
+            }
+            if (key === 'VAR') cur.name = val || cur.name;
+            else if (key === 'LABEL') cur.label = val;
+            else if (key === 'TYPE') cur.type = (val || 'float').toLowerCase();
+            else if (key === 'MIN') cur.min = parseFloat(val);
+            else if (key === 'MAX') cur.max = parseFloat(val);
+            else if (key === 'DEFAULT') cur.default = parseFloat(val);
+            else if (key === 'STEP') cur.step = parseFloat(val);
+        }
+        if (cur && cur.name) defs.push(finalizeParamDef(cur));
+        return defs;
+    }
+
+    function finalizeParamDef(d) {
+        const name = String(d.name).trim();
+        return {
+            name,
+            label: d.label || name,
+            type: d.type || 'float',
+            default: num(d.default, 0),
+            min: num(d.min, 0),
+            max: num(d.max, 1),
+            step: num(d.step, 0.01),
+        };
     }
 
     // 載入著色器程式碼 (快取以避免重複載入)
@@ -608,6 +681,7 @@ document.addEventListener('DOMContentLoaded', () => {
             renderPipelineUI,
             renderPropertiesUI,
             parseUniforms,
+            parseParamDirectives,
             readLegacyParamDefs,
             getState: () => ({ pipeline, libraryEntries, libraryError, selectedItemId }),
             setLibrary: (entries) => { libraryEntries = entries; },
