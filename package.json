@@ -4,7 +4,13 @@
   "description": "**版本：** 1.0 **作者：** Gemini AI **日期：** 2025年10月29日",
   "main": "index.js",
   "scripts": {
+    "postinstall": "node scripts/sync-wgfx.mjs --soft",
+    "sync:wgfx": "node scripts/sync-wgfx.mjs",
+    "check:wgfx": "node scripts/sync-wgfx.mjs --check",
     "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "devDependencies": {
+    "wgfx": "file:../WGFX"
   },
   "repository": {
     "type": "git",

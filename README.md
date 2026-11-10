@@ -94,6 +94,22 @@ The parser scans a shader file for special comment lines starting with `//!`. Th
 
 This directory is intended for shaders written in WGSL (WebGPU Shading Language). It signifies an experimental or future-proofed part of the project, allowing it to leverage the newer WebGPU API for potentially better performance.
 
+### WGFX Core Library (ESM dependency)
+
+The core engine is the separate [WGFX](https://github.com/sinchichou/WGFX) package — it is **no longer copied in by hand**.
+
+```bash
+npm install          # links wgfx (file:../WGFX) and runs the postinstall sync
+npm run sync:wgfx    # re-vendor after updating the core library
+npm run check:wgfx   # CI: fails if vendor/ is out of date
+```
+
+- `scripts/sync-wgfx.mjs` copies `node_modules/wgfx/dist/wgfx.browser.esm.js` into `vendor/`
+  (falling back to a sibling `../WGFX/dist` checkout) and records the source version + hash in
+  `vendor/.wgfx-sync.json`.
+- `content.js` imports it as ESM: `await import(chrome.runtime.getURL('vendor/wgfx.browser.esm.js'))`.
+- `vendor/` is generated and git-ignored — **never edit it by hand**.
+
 ---
 
 # YouTube VSR - 即時影片著色器擴充功能
@@ -185,6 +201,21 @@ This directory is intended for shaders written in WGSL (WebGPU Shading Language)
 ### `effects_wgsl/` 目錄
 
 此目錄用於存放以 WGSL（WebGPU Shading Language）編寫的著色器。它代表了專案中實驗性或為未來做準備的部分，使其能夠利用更新的 WebGPU API 以獲得潛在的更佳效能。
+
+### WGFX 核心庫（ESM 相依）
+
+核心引擎是獨立的 [WGFX](https://github.com/sinchichou/WGFX) 套件——**已不再手動複製檔案進本專案**。
+
+```bash
+npm install          # 建立 wgfx 相依（file:../WGFX）並自動執行同步
+npm run sync:wgfx    # 更新核心庫後重新攤銷
+npm run check:wgfx   # CI 用：若 vendor/ 與來源不同步則失敗
+```
+
+- `scripts/sync-wgfx.mjs` 會把 `node_modules/wgfx/dist/wgfx.browser.esm.js` 複製到 `vendor/`
+  （找不到套件時退回同層的 `../WGFX/dist`），並將來源版本與雜湊記錄於 `vendor/.wgfx-sync.json`。
+- `content.js` 以 ESM 匯入：`await import(chrome.runtime.getURL('vendor/wgfx.browser.esm.js'))`。
+- `vendor/` 是產生物且已列入 gitignore——**請勿手動編輯**。
 
 ### 展示
 

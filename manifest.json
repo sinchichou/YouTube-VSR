@@ -25,7 +25,9 @@
         "*://www.youtube.com/watch*",
         "*://www.twitch.tv/*"
       ],
-      "js": ["content.js"]
+      "js": [
+        "content.js"
+      ]
     }
   ],
   "web_accessible_resources": [
@@ -35,8 +37,11 @@
         "*://www.twitch.tv/*"
       ],
       "resources": [
-        "wgfx.browser.esm.js",
-        "effects_wgsl/**/*.wgsl"
+        "vendor/wgfx.browser.esm.js",
+        "wgx/**/*.wgx",
+        "wgx/*/*.wgx",
+        "effects_wgsl/**/*.wgsl",
+        "effects_wgsl/*.wgsl"
       ]
     }
   ],
