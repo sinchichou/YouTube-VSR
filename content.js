@@ -4,9 +4,11 @@
  */
 
 (async function () {
-    /** @type {boolean} 防止重複注入 */
-    if (window.vsrInjected) return;
-    window.vsrInjected = true;
+    /* 重複注入防護說明:
+     * 舊版以 `window.vsrInjected` 早退 — 但擴充套件「重載」後該旗標殘留在隔離世界,
+     * 而舊監聽器已隨舊 context 失效 → 分頁永久失聯,直到重新整理。
+     * 現行策略:每次注入都重建 controller(先 teardown 舊實例),監聽器改經
+     * `window.__vsrMessageHandler` 全域轉發 — 重載後新注入的腳本能重新接手。 */
 
     // ===================================================================
     // [1] VSRLogger - 外部日誌工具 (Host Logic)
@@ -286,6 +288,19 @@
             }
         }
 
+        /**
+         * popup 送來新的管線 — 執行中則重編譯套用(管線資料已由 popup 寫入 storage)。
+         */
+        async setPipeline() {
+            if (this.state === 'RUNNING') await this.restart();
+        }
+
+        /** 停止後重新啟動(管線變更、SPA 導覽、解析度變更共用) */
+        async restart() {
+            await this.stop();
+            await this.start();
+        }
+
         async stop() {
             VSRLogger.info("系統停止中...");
             if (this.frameId) cancelAnimationFrame(this.frameId);
@@ -365,15 +380,31 @@
     // ===================================================================
     const vsr = new VSRController();
 
-    chrome.runtime.onMessage.addListener((msg, sender, sendResponse) => {
+    // 處理器經全域轉發:擴充套件重載後,舊注入的監聽器已隨舊 context 失效,
+    // 新注入的腳本在此重新註冊監聽,handler 永遠分派到最新的 controller。
+    window.__vsrMessageHandler = (msg, sender, sendResponse) => {
         if (msg.command === 'setEnable') {
             msg.isEnabled ? vsr.start() : vsr.stop();
         } else if (msg.command === 'updateParameter') {
             vsr.processor?.wgfx?.updateUniforms({ [msg.paramName]: msg.value });
+        } else if (msg.command === 'setPipeline') {
+            vsr.setPipeline();   // 舊版漏接 — 管線變更從未生效的根源之一
+        } else if (msg.command === 'navigation') {
+            vsr.restart();       // 舊版漏接 — SPA 換影片後未重新初始化
         }
         sendResponse({ status: 'received' });
         return true;
+    };
+    chrome.runtime.onMessage.addListener((msg, sender, sendResponse) => {
+        window.__vsrMessageHandler(msg, sender, sendResponse);
+        return true;
     });
+
+    // 重注入(擴充套件重載後):先拆掉舊 controller(孤兒 context)再全新啟動
+    if (window.__vsrController) {
+        try { await window.__vsrController.stop(); } catch (e) { /* 舊實例可能已失效 */ }
+    }
+    window.__vsrController = vsr;
 
     // 初始啟動檢查
     chrome.storage.local.get('isEnabled', (res) => {

@@ -628,12 +628,91 @@ document.addEventListener('DOMContentLoaded', () => {
     // EVENT LISTENERS & NOTIFIERS
     //================================================================================
 
+    /**
+     * 判斷分頁 URL 是否為 content script 注入的支援頁面(與 manifest.json 一致)。
+     */
+    function isSupportedVideoURL(url) {
+        return typeof url === 'string' &&
+            /^https:\/\/(www\.)?(youtube\.com\/watch|twitch\.tv\/)/i.test(url);
+    }
+
+    /**
+     * 傳訊息給目前分頁的 content script。
+     *
+     * 「Could not establish connection. Receiving end does not exist.」的兩個來源:
+     *   1. 作用分頁不是支援的影片頁(非 youtube.com/watch 或 twitch.tv);
+     *   2. 擴充套件重載後,既有分頁的 content script 已孤兒化(監聽器失效),
+     *      在頁面重新整理之前收不到任何訊息。
+     * 對 (2) 以 chrome.scripting.executeScript 重新注入 content.js 後重試
+     * (content.js 的監聽器在模組載入後才註冊,故以遞增延遲重試數次)。
+     *
+     * @returns {Promise<{ok: boolean, reason?: string}>}
+     */
+    async function sendToContent(message) {
+        // callback 形式包成 Promise:真實 MV3 與 scripts/verify-popup.mjs 的 stub 都相容
+        const tabs = await new Promise((resolve) => chrome.tabs.query({ active: true, currentWindow: true }, resolve));
+        const tab = tabs && tabs[0];
+        if (!tab) return { ok: false, reason: 'no-tab' };
+        if (!isSupportedVideoURL(tab.url)) return { ok: false, reason: 'unsupported-page' };
+
+        try {
+            await chrome.tabs.sendMessage(tab.id, message);
+            return { ok: true };
+        } catch (err) {
+            const msgText = String((err && err.message) || err);
+            if (!/Receiving end does not exist|Could not establish connection/i.test(msgText)) {
+                return { ok: false, reason: 'error', error: err };
+            }
+        }
+
+        // 接收端不存在 → 重新注入 content.js 後重試(修復「重載擴充套件後舊分頁失聯」)
+        try {
+            await chrome.scripting.executeScript({ target: { tabId: tab.id }, files: ['content.js'] });
+        } catch (e2) {
+            return { ok: false, reason: 'inject-failed', error: e2 };
+        }
+        for (const delay of [150, 400, 800]) {
+            await new Promise((r) => setTimeout(r, delay));
+            try {
+                await chrome.tabs.sendMessage(tab.id, message);
+                return { ok: true };
+            } catch (e3) { /* 監聽器尚未就緒,繼續重試 */ }
+        }
+        return { ok: false, reason: 'no-receiver' };
+    }
+
+    /** 把失敗原因轉成使用者能採取行動的提示(popup 內浮現,數秒後消失) */
+    function flashStatus(text) {
+        const el = document.createElement('div');
+        el.textContent = text;
+        el.style.cssText = 'position:fixed; left:12px; right:12px; bottom:12px; z-index:99;' +
+            'padding:10px 12px; border-radius:8px; font-size:12px; line-height:1.5;' +
+            'background:var(--bg-secondary, #2a2a2a); color:var(--text-primary, #eee);' +
+            'border:1px solid var(--danger-color, #e53935); box-shadow:0 4px 14px rgba(0,0,0,.4);';
+        document.body.appendChild(el);
+        setTimeout(() => el.remove(), 4000);
+    }
+
+    /** 儲存後通知 content.js;失敗時在 popup 內給出可採取行動的提示(不再丟未處理 rejection) */
+    async function notifyContent(message) {
+        const res = await sendToContent(message);
+        if (!res.ok) {
+            const MESSAGES = {
+                'unsupported-page': '這個分頁不是 YouTube/Twitch 影片頁 — 請開啟影片頁面再套用效果。',
+                'no-tab': '找不到作用中的分頁。',
+                'inject-failed': '無法在此頁面注入(VSP 僅支援 YouTube/Twitch 影片頁)。',
+                'no-receiver': '與影片頁的連線中斷 — 請重新整理 YouTube 分頁後再試。',
+            };
+            flashStatus(MESSAGES[res.reason] || '通知影片頁失敗,請重新整理分頁。');
+            console.warn('[VSR] notifyContent failed:', res);
+        }
+        return res;
+    }
+
     function setupEventListeners() {
         masterToggle.addEventListener('change', async () => {
             await chrome.storage.local.set({ isEnabled: masterToggle.checked });
-            chrome.tabs.query({ active: true, currentWindow: true }, (tabs) => {
-                chrome.tabs.sendMessage(tabs[0].id, { command: "setEnable", isEnabled: masterToggle.checked });
-            });
+            await notifyContent({ command: "setEnable", isEnabled: masterToggle.checked });
         });
 
         setupPipelineDragAndDrop();
@@ -642,26 +721,18 @@ document.addEventListener('DOMContentLoaded', () => {
     // 儲存完整管線並通知 content.js
     async function saveAndNotifyPipelineChange() {
         await chrome.storage.local.set({ pipeline: pipeline });
-        chrome.tabs.query({ active: true, currentWindow: true }, (tabs) => {
-            if (tabs[0]) {
-                chrome.tabs.sendMessage(tabs[0].id, { command: "setPipeline", pipeline: pipeline });
-            }
-        });
+        await notifyContent({ command: "setPipeline", pipeline: pipeline });
     }
 
     // 儲存單一參數變更並通知 content.js
     async function saveAndNotifyParameterChange(instanceId, paramName, value) {
         // 僅更新 pipeline 陣列中的參數值並儲存
         await chrome.storage.local.set({ pipeline: pipeline });
-        chrome.tabs.query({ active: true, currentWindow: true }, (tabs) => {
-            if (tabs[0]) {
-                chrome.tabs.sendMessage(tabs[0].id, {
-                    command: "updateParameter",
-                    instanceId: instanceId,
-                    paramName: paramName,
-                    value: value
-                });
-            }
+        await notifyContent({
+            command: "updateParameter",
+            instanceId: instanceId,
+            paramName: paramName,
+            value: value
         });
     }
 

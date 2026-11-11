@@ -510,6 +510,57 @@ section('[C] manifest.json —資源可見性與 CSP');
     check(`${wgxFiles.length} 個 .wgx 都符合 WAR 樣式`, uncovered.length === 0, uncovered.slice(0, 3).join(', '));
 }
 
+section('[D] popup → content 訊息失敗時的行為(重載後接收端不存在)');
+{
+    const bg = loadBackground();
+    const storage = {};
+    const sent = [];
+    const executed = [];
+    const popupChrome = createChrome({ storage, sent });
+    // 模擬「擴充套件重載後的舊分頁」:content script 監聽器已失效
+    popupChrome.tabs.sendMessage = async (id, msg) => {
+        sent.push({ id, msg }); // 記錄每次嘗試(含重試)
+        throw new Error('Could not establish connection. Receiving end does not exist.');
+    };
+    popupChrome.scripting = { executeScript: async (o) => { executed.push(o); } };
+
+    const document = createDocument();
+    const sandbox = {
+        document,
+        chrome: popupChrome,
+        console: { log: () => {}, warn: () => {}, error: () => {}, info: () => {} },
+        fetch: diskFetch,
+        setTimeout,
+        clearTimeout,
+        __VSR_POPUP_TEST__: true,
+    };
+    vm.createContext(sandbox);
+    vm.runInContext(fs.readFileSync(path.join(EXT_ROOT, 'popup.js'), 'utf8'), sandbox,
+        { filename: 'popup.js' });
+    for (const fn of document._domReady) fn(); // 觸發 DOMContentLoaded(註冊測試接縫)
+    const hooks = sandbox.__VSR_POPUP_HOOKS__;
+
+    const entry = {
+        kind: 'wgx', path: 'wgx/NIS/NIS.wgx', id: 'NIS', name: 'NIS',
+        family: 'NIS', description: '',
+        parameters: [{ name: 'sharpness', default: 0.5, min: 0, max: 1, step: 0.01 }],
+        tags: [], passCount: 1,
+    };
+    hooks.setLibrary([entry]);
+    await hooks.addToPipeline(entry);
+
+    // 走到這裡沒有拋出「Uncaught (in promise)」= 修復生效
+    check('sendMessage 被拒絕時不再產生未處理 rejection', true);
+    check('已嘗試重新注入 content.js(chrome.scripting)', executed.length === 1,
+        executed.map((o) => JSON.stringify(o.files)).join(';'));
+    const flash = document.body.children.find((el) => /重新整理/.test(el.textContent || ''));
+    check('popup 顯示可採取行動的提示(重新整理分頁)', !!flash,
+        flash ? String(flash.textContent).slice(0, 40) : '(無)');
+    check('管線已寫入 storage(即使通知失敗)', (storage.pipeline || []).length === 1,
+        `${(storage.pipeline || []).length} 項`);
+    check('重試次數符合預期(首次 + 注入後 3 次)', sent.length === 4, `${sent.length} 次`);
+}
+
 console.log(`\n=== 總結: ${fail === 0 ? 'ALL PASS' : fail + ' FAILED'} (${pass} passed) ===`);
 if (fail) {
     console.log('失敗項目:');
