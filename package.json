@@ -7,7 +7,10 @@
     "postinstall": "node scripts/sync-wgfx.mjs --soft",
     "sync:wgfx": "node scripts/sync-wgfx.mjs",
     "check:wgfx": "node scripts/sync-wgfx.mjs --check",
-    "test": "echo \"Error: no test specified\" && exit 1"
+    "verify:content": "node scripts/verify-content.mjs",
+    "verify:popup": "node scripts/verify-popup.mjs",
+    "verify": "node scripts/verify-content.mjs && node scripts/verify-popup.mjs",
+    "test": "npm run verify"
   },
   "devDependencies": {
     "wgfx": "file:../WGFX"

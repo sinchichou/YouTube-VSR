@@ -392,6 +392,56 @@
             align-items: center;
             gap: 8px;
         }
+
+        /* ===== 效果說明 tooltip(滑鼠移入 / 鍵盤 focus)===== */
+        #vsr-tooltip {
+            position: fixed;
+            z-index: 999;
+            max-width: 340px;
+            padding: 10px 12px;
+            background: var(--bg-panel, #0d1117);
+            border: 1px solid var(--border-subtle, rgba(240, 246, 252, 0.1));
+            border-radius: var(--radius-m, 12px);
+            box-shadow: 0 8px 24px rgba(0, 0, 0, 0.5);
+            font-size: 12px;
+            line-height: 1.55;
+            color: var(--text-primary, #e6edf3);
+            pointer-events: none; /* 不擋住滑鼠,移入後立即離開也不黏住 */
+        }
+
+        #vsr-tooltip .vsr-tip-name {
+            font-weight: 600;
+            font-size: 13px;
+            color: #fff;
+            margin-bottom: 2px;
+        }
+
+        #vsr-tooltip .vsr-tip-meta {
+            color: var(--accent-color, #a371f7);
+            font-size: 11px;
+            margin-bottom: 6px;
+        }
+
+        #vsr-tooltip .vsr-tip-zh {
+            color: var(--text-primary, #e6edf3);
+            margin-bottom: 4px;
+        }
+
+        #vsr-tooltip .vsr-tip-en {
+            color: var(--text-secondary, #8b949e);
+            margin-bottom: 4px;
+        }
+
+        #vsr-tooltip .vsr-tip-path {
+            color: var(--text-secondary, #8b949e);
+            font-family: ui-monospace, Consolas, monospace;
+            font-size: 10px;
+            opacity: 0.75;
+            word-break: break-all;
+            border-top: 1px solid var(--border-subtle, rgba(240, 246, 252, 0.1));
+            padding-top: 4px;
+            margin-top: 2px;
+        }
     </style>
 </head>
 <body>

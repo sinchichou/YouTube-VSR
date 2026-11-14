@@ -392,6 +392,54 @@ section('[B] popup.js —效果庫與管線 DOM 產出');
     check('legacy 項目標示 .wgsl', !!legacyItem && legacyItem.children[0].children[1].textContent.startsWith('.wgsl'),
         legacyItem ? legacyItem.children[0].children[1].textContent : '');
 
+    // ---- 樣式化 tooltip(雙語說明;滑鼠移入/鍵盤 focus 顯示)----
+    {
+        const tipItem = items.find((li) => li.dataset.entryPath === 'wgx/Anime4K/Anime4K_3D_AA_Upscale_US.wgx');
+        check('效果庫含 Anime4K_3D_AA_Upscale_US', !!tipItem);
+        check('項目繫結雙語說明(_vsrEntry.descEn/descZh)',
+            !!tipItem && !!tipItem._vsrEntry
+            && typeof tipItem._vsrEntry.descEn === 'string' && tipItem._vsrEntry.descEn.length > 0
+            && typeof tipItem._vsrEntry.descZh === 'string' && tipItem._vsrEntry.descZh.length > 0,
+            tipItem && tipItem._vsrEntry
+                ? `zh=${(tipItem._vsrEntry.descZh || '').slice(0, 20)}… / en=${(tipItem._vsrEntry.descEn || '').slice(0, 30)}…`
+                : '');
+
+        // 模擬滑鼠移入 → 120ms 延遲後 tooltip 出現,內容含中英說明與路徑
+        tipItem.dispatch('mouseenter');
+        await new Promise((r) => setTimeout(r, 200));
+        const tip = document.body.children.find((c) => c.id === 'vsr-tooltip');
+        // stub 的 textContent 不會從子節點彙總 → 由子節點串接(真 DOM 亦可)
+        const tipText = tip ? tip.children.map((c) => c.textContent).join('\n') : '';
+        check('mouseenter 後 tooltip 出現', !!tip && tip.style.display === 'block');
+        check('tooltip 含中文說明', tipText.includes((tipItem._vsrEntry.descZh || '').slice(0, 10)),
+            tipText.slice(0, 60));
+        check('tooltip 含英文說明', tipText.includes((tipItem._vsrEntry.descEn || '').slice(0, 20)));
+        check('tooltip 顯示效果名稱與路徑',
+            tipText.includes('Anime4K_3D_AA_Upscale_US')
+            && tipText.includes('wgx/Anime4K/Anime4K_3D_AA_Upscale_US.wgx'));
+        tipItem.dispatch('mouseleave');
+        await new Promise((r) => setTimeout(r, 10));
+        check('mouseleave 後 tooltip 隱藏', !!tip && tip.style.display === 'none');
+
+        // 鍵盤可達:focus 顯示、blur 隱藏
+        tipItem.dispatch('focus');
+        await new Promise((r) => setTimeout(r, 200));
+        check('focus 顯示 tooltip(鍵盤可達)', tip.style.display === 'block');
+        tipItem.dispatch('blur');
+        await new Promise((r) => setTimeout(r, 10));
+        check('blur 隱藏 tooltip', tip.style.display === 'none');
+
+        // 不再使用原生 title(避免原生與自訂 tooltip 疊成雙重提示)
+        check('效果庫項目不掛原生 title',
+            items.every((li) => !li.title || li.title === ''));
+
+        // legacy .wgsl 也有雙語說明
+        check('legacy .wgsl 項目帶雙語說明',
+            !!legacyItem && !!legacyItem._vsrEntry
+            && legacyItem._vsrEntry.descEn.length > 0 && legacyItem._vsrEntry.descZh.length > 0,
+            legacyItem && legacyItem._vsrEntry ? legacyItem._vsrEntry.descZh.slice(0, 20) : '');
+    }
+
     // ---- 加入 .wgx 套件包(參數取自索引;不應該去抓 .wgx 檔)----
     fetchLog.length = 0;
     const nisEntry = hooks.getState().libraryEntries.find((e) => e.path === 'wgx/NIS/NIS.wgx');

@@ -317,3 +317,122 @@ node scripts/verify-popup.mjs   # 以程式化方式驗證效果庫/background/p
 #### 禁用後
 
 ![VSR_off](VSR_off.png)
+
+---
+
+## 修復記錄 / Fix Notes (2026-11)
+
+### 1. 升頻後畫面異常(每幀 `CopyTextureToTexture` 驗證錯誤)
+
+**症狀**:`copy range (3840x2160) touches outside of … (1920x1080)` + `[Invalid CommandBuffer]`,
+畫面卡在原片/黑屏。
+
+**根因**:`content.js` 以 `wgfx.runtime.resourceManager.getTexture('OUTPUT')` 取輸出尺寸,
+但 `.wgx` 套件實例(`WGFXPackageInstance`)**沒有 `runtime` 屬性**(`resourceManager` 為直接屬性),
+取值永遠落回影片尺寸(1080p),而升頻效果的 OUTPUT 實際是 2x(4K)→ Canvas 配 1080p、
+每幀 copy 尺寸不符。
+
+**修復**:`resolveOutputSize()` 同時支援兩種實例形狀
+(`resourceManager` / `runtime.resourceManager` / `outWidth`+`outHeight`),
+Canvas 依「實際 OUTPUT 尺寸」配置;`CanvasRenderer.render()` 另有尺寸自癒防線
+(偵測不一致時自動重新配置 Canvas,不再每幀失敗)。
+
+### 2. 「Unsafe attempt to load URL … Domains, protocols and ports must match.」
+
+**根因**:內容腳本(隔離世界)從 youtube.com 框架直接 `fetch(chrome-extension://…/wgx/*.wgx)`,
+雖因 `web_accessible_resources` 載入成功,但 Blink 會記此錯誤。
+
+**修復**:`.wgx`/`.wgsl` 改由背景 service worker 代抓
+(`chrome.runtime.sendMessage({command:'fetchResource'})` → base64 傳回 →
+`WGFXPackage.fromBytes()`),路徑白名單限制於 `wgx/**`、`effects_wgsl/**`;
+訊息失敗時自動退回直接 fetch,行為不劣化。
+
+### 3. 其他強化
+
+- **首幀才隱藏原影片**:編譯/首幀失敗時不再黑屏,至少看得到原片。
+- **連續幀錯誤降級**:連續 120 幀失敗 → 自動還原原影片並進入 `ERROR` 狀態(可重啟)。
+- **重啟競態修復**:rVFC 以對應的 `cancelVideoFrameCallback` 取消 + 迴圈代數(gen)隔離,
+  `stop→start` 不再產生雙渲染迴圈。
+- **解析度重啟條件修復**:只比對影片串流尺寸變化,不再拿 canvas 尺寸比對
+  (升頻下兩者恆不相等,會造成 RO 初始回呼觸發無限重編譯)。
+- **GPU 裝置遺失自動重啟**、`uncapturederror` 節流記錄、`debugVSR` 日誌開關確實生效、
+  FPS 偵錯計數。
+- **驗證腳本**:`npm run verify`(content/background 82 項 + popup 67 項檢查)。
+
+### 多效果管線 / Multi-Effect Pipeline (2026-11)
+
+popup 管線中的**每一個**效果現在都會生效,依序串接:
+
+```
+影片 → 效果1 → OUTPUT → blit → 效果2 → OUTPUT → … → Canvas
+```
+
+- **尺寸自動傳遞**:效果 i 的實際輸出(升頻效果的宣告尺寸)= 效果 i+1 的輸入;
+  Canvas 內部解析度 = 管線尾端輸出,水印顯示整條鏈的總倍率。
+- **鏈結 blit**:上下級格式不同(OUTPUT `rgba16float` / INPUT `rgba8unorm`),
+  不能 `copyTextureToTexture`,以全螢幕三角取樣做格式轉換(bind group 只建一次)。
+- **提交策略**:效果 1 的輸入上傳 + 所有效果 passes + 鏈結 blit + 畫布呈現
+  全部錄進**同一個 encoder**,整幀僅 **1 次 queue submit**;scene buffer
+  補寫含 `frame` 計數器(時間性效果不受影響)。
+- **參數路由**:屬性面板改動經 `instanceId` 精準套用到對應效果
+  (`VSR.status()` 的 `pipeline` 欄位現在是效果名稱陣列)。
+- 上游 WGFX 改版若造成派發不相容,會在**編譯期**拋錯並降級回原影片(fail-fast);
+  錯誤訊息會指名是哪個效果、缺哪個 API。
+
+### 效能優化 / Performance (擴充功能端)
+
+**幀熱路徑(每幀執行的事)**
+
+- **整幀 1 次 queue submit**:`processFrame()` 把「輸入上傳 → 效果 1 passes → 鏈結
+  blit+passes → 呈現 blit」全部錄進**同一個 encoder** 一次提交(先前單效果 2 次、
+  多效果 3 次 submit);單/多效果共用同一條路徑。
+- **呈現走取樣 blit + 畫布偏好格式**:畫布從 `rgba16float` copy 改為
+  `getPreferredCanvasFormat()`(通常 `bgra8unorm`)的渲染目標 —— 4K@60 的呈現頻寬
+  約省一半(每像素 8B vs 16B),並走瀏覽器合成器的最快路徑;float→8bit 轉換
+  由 GPU 上的 blit 順帶完成,畫布不再需要 COPY_DST。
+- **直接以 `<video>` 元素為輸入**:`copyExternalImageToTexture` 原生支援,
+  免每幀 VideoFrame 物件配置與 close。
+- **pass metadata 編譯期預解析**(`entry.passes`):熱路徑不再對 manifest 做
+  `metas.find`;鏈結 blit 的 render-pass 描述器(`link.passDesc`)與 bind group
+  只建一次。
+- **畫布 view 按紋理身分快取**:swapchain 紋理未換即不重建 view;
+  `prepareRenderTarget()` 內含畫布尺寸自癒(取代每幀 copy 驗證)。
+- **熱路徑零 DOM 往返**:覆蓋層位置由 ResizeObserver(影片 + 播放器容器)驅動
+  髒旗標,變更時才 `getBoundingClientRect` ×2 與寫 style。
+- **熱路徑零 JS 物件垃圾**:encoder 描述器與 clear 色碼為模組常數
+  (`ENCODER_DESC`/`CLEAR_BLACK`);`processFrame` 為同步函式(無 async 開銷)。
+- 影片暫停或分頁隱藏時 rVFC 不觸發,處理循環自然停止。
+
+### 效果庫雙語說明與 Tooltip(2026-11)
+
+- **每個效果都有中英說明**(`effect-descriptions.json`,人工維護):說明該效果**做什麼**、
+  如何運作(例如「去除色帶 — 以細緻抖動雜訊撫平漸層」「CNN 線條修復器,規模 UL — 修復壓縮失真」)、
+  是否改變尺寸,以及型號字尾的意義(S/M/L/VL/UL = 網路規模、R2-R4 = 半徑、-DN = 含降噪…)。
+  覆蓋全部 127 個 `.wgx` 套件包 + 20 個 legacy `.wgsl`(同名效果共用說明,byPath 可覆寫)。
+- **樣式化 tooltip**(比照正規擴充功能做法,不用原生 title):
+  - 滑鼠移入效果庫項目約 120ms 後浮出;顯示**名稱、型別/pass/參數摘要、中文說明、英文說明、檔案路徑**;
+  - 鍵盤可達:項目 `tabindex=0`,Tab 聚焦即顯示、失焦隱藏;
+  - 定位夾限在 popup 視窗內(右側優先,溢出自動收回);
+  - 說明由 background 合併進效果清單(`getShaderFiles` → `descEn`/`descZh`),popup 無需額外請求。
+- 維護方式:編輯 `effect-descriptions.json` 的 `byName`(key = 去副檔名的基底名稱小寫)即可,
+  重新載入擴充功能生效;同步 WGFX 套件不會覆寫此檔。
+
+### 淺色水印 / Watermark
+
+VSR 啟用中會在影片右下角顯示淺色徽章(例:`VSR ×2.0`,白 42% + 黑 30% 膠囊底,
+零 GPU 成本)。預設開啟,狀態保存於 `chrome.storage.local` 的 `watermark`。
+
+### 主控台控制 / Console Control
+
+在 **DevTools 主控台**(Console 面板,預設 context 即可用)提供 `window.VSR` API:
+
+| 指令 | 說明 |
+| --- | --- |
+| `VSR.status()` | 狀態快照(state / pipeline / video / output / fps / watermark) |
+| `VSR.watermark()` / `VSR.watermark(false)` | 查詢 / 開關水印(永久保存) |
+| `VSR.enable()` / `VSR.disable()` / `VSR.toggle()` | 開關 VSR 本體 |
+
+實作:背景以 `chrome.scripting.executeScript({world:'MAIN'})` 注入橋接
+(繞過頁面 CSP;`manifest.json` 因此新增 `host_permissions`),
+經 `CustomEvent('vsr-console-cmd' / 'vsr-console-res')` 與內容腳本通訊。
+在 DevTools context 下拉選單切到本擴充套件時,也可直接使用隔離世界的同名 `VSR` API。

@@ -99,6 +99,8 @@ document.addEventListener('DOMContentLoaded', () => {
                     name: baseName(item),
                     family: familyOf(item),
                     description: '',
+                    descEn: '',
+                    descZh: '',
                     parameters: null,
                     tags: [],
                     passCount: 0,
@@ -113,6 +115,8 @@ document.addEventListener('DOMContentLoaded', () => {
                 name: String(item.name || baseName(item.path)),
                 family: String(item.family || familyOf(item.path)),
                 description: String(item.description || ''),
+                descEn: String(item.descEn || ''),
+                descZh: String(item.descZh || ''),
                 parameters: Array.isArray(item.parameters) ? item.parameters : null,
                 tags: Array.isArray(item.tags) ? item.tags : [],
                 passCount: Number(item.passCount || 0),
@@ -180,13 +184,15 @@ document.addEventListener('DOMContentLoaded', () => {
         }
     }
 
-    /** 建立單一效果庫項目(name + 中繼資訊 + 「+」按鈕,並支援拖曳到管線) */
+    /** 建立單一效果庫項目(name + 中繼資訊 + 「+」按鈕,並支援拖曳到管線)
+     *  說明以樣式化 tooltip 呈現(滑鼠移入/鍵盤 focus),不再用原生 title。 */
     function buildLibraryItem(entry) {
         const li = document.createElement('li');
-        li.title = entry.description ? `${entry.path}\n\n${entry.description}` : entry.path;
         li.draggable = true;
+        li.tabIndex = 0; // 鍵盤可達:focus 時也會顯示說明
         li.dataset.entryPath = entry.path;
         li.dataset.entryKind = entry.kind;
+        li._vsrEntry = entry; // tooltip 測試與除錯用
 
         const main = document.createElement('div');
         main.style.cssText = 'min-width: 0; flex: 1 1 auto; display: flex; flex-direction: column;';
@@ -213,6 +219,12 @@ document.addEventListener('DOMContentLoaded', () => {
         li.appendChild(main);
         li.appendChild(addButton);
 
+        // tooltip 觸發(滑鼠 + 鍵盤)
+        li.addEventListener('mouseenter', () => tooltip.show(entry, li));
+        li.addEventListener('mouseleave', () => tooltip.hide());
+        li.addEventListener('focus', () => tooltip.show(entry, li));
+        li.addEventListener('blur', () => tooltip.hide());
+
         li.addEventListener('dragstart', (e) => {
             dragPayload = { kind: 'library', path: entry.path };
             if (e.dataTransfer) {
@@ -225,14 +237,100 @@ document.addEventListener('DOMContentLoaded', () => {
         return li;
     }
 
-    /** 項目下方的一行中繼資訊:.wgx/.wgsl、pass 數、參數數、描述 */
+    /** 項目下方的一行中繼資訊:.wgx/.wgsl、pass 數、參數數(完整說明在 tooltip) */
     function describeEntry(entry) {
         const bits = [entry.kind === 'wgx' ? '.wgx 套件包' : '.wgsl'];
         if (entry.kind === 'wgx' && entry.passCount > 0) bits.push(`${entry.passCount} pass`);
         if (entry.parameters && entry.parameters.length > 0) bits.push(`${entry.parameters.length} 參數`);
-        if (entry.description) bits.push(entry.description);
         return bits.join(' · ');
     }
+
+    //================================================================================
+    // TOOLTIP — 樣式化雙語說明
+    //================================================================================
+    // 比照正規擴充功能的做法:不用原生 title(樣式不可控、延遲長、會與自訂框
+    // 疊成雙重提示),改為自訂 tooltip:事件綁定在項目上(mouseenter/mouseleave/
+    // focus/blur,鍵盤可達),定位夾限在 popup 視窗內,滑過清單時以短延遲防閃現。
+
+    /** 安全取 rect(測試 stub 的元素沒有 getBoundingClientRect) */
+    function safeRect(el) {
+        if (el && typeof el.getBoundingClientRect === 'function') {
+            return el.getBoundingClientRect();
+        }
+        return { left: 0, top: 0, right: 0, bottom: 0, width: 0, height: 0 };
+    }
+
+    const tooltip = {
+        el: null,
+        timer: null,
+        entry: null,
+        _ensure() {
+            if (this.el) return this.el;
+            const el = document.createElement('div');
+            el.id = 'vsr-tooltip';
+            if (typeof el.setAttribute === 'function') el.setAttribute('role', 'tooltip');
+            el.style.display = 'none';
+            document.body.appendChild(el);
+            this.el = el;
+            return el;
+        },
+        _build(entry) {
+            const t = this._ensure();
+            t.innerHTML = '';
+            const head = document.createElement('div');
+            head.className = 'vsr-tip-name';
+            head.textContent = entry.name || baseName(entry.path);
+            const meta = document.createElement('div');
+            meta.className = 'vsr-tip-meta';
+            meta.textContent = describeEntry(entry);
+            t.appendChild(head);
+            t.appendChild(meta);
+            if (entry.descZh) {
+                const zh = document.createElement('div');
+                zh.className = 'vsr-tip-zh';
+                zh.textContent = entry.descZh;
+                t.appendChild(zh);
+            }
+            if (entry.descEn) {
+                const en = document.createElement('div');
+                en.className = 'vsr-tip-en';
+                en.textContent = entry.descEn;
+                t.appendChild(en);
+            }
+            const pathEl = document.createElement('div');
+            pathEl.className = 'vsr-tip-path';
+            pathEl.textContent = entry.path;
+            t.appendChild(pathEl);
+            return t;
+        },
+        show(entry, anchor) {
+            clearTimeout(this.timer);
+            this.entry = entry;
+            // 短延遲:滑鼠掃過清單時不閃現
+            this.timer = setTimeout(() => {
+                if (this.entry !== entry) return;
+                const t = this._build(entry);
+                const vw = (typeof window !== 'undefined' && window.innerWidth) || 800;
+                const vh = (typeof window !== 'undefined' && window.innerHeight) || 600;
+                const r = safeRect(anchor);
+                t.style.display = 'block';
+                const tw = t.offsetWidth || 320;
+                const th = t.offsetHeight || 140;
+                let left = (r.right || r.left) + 8;
+                if (left + tw > vw - 8) left = Math.max(8, vw - tw - 8);
+                let top = Math.max(8, (r.top || 0) - 6);
+                if (top + th > vh - 8) top = Math.max(8, vh - th - 8);
+                t.style.left = `${left}px`;
+                t.style.top = `${top}px`;
+                t.style.display = 'block';
+            }, 120);
+        },
+        hide() {
+            clearTimeout(this.timer);
+            this.entry = null;
+            if (this.el) this.el.style.display = 'none';
+        },
+    };
 
     //================================================================================
     // RENDER PIPELINE
@@ -757,6 +855,9 @@ document.addEventListener('DOMContentLoaded', () => {
             getState: () => ({ pipeline, libraryEntries, libraryError, selectedItemId }),
             setLibrary: (entries) => { libraryEntries = entries; },
             setPipeline: (items) => { pipeline = items; },
+            showTooltip: (entry, anchor) => tooltip.show(entry, anchor),
+            hideTooltip: () => tooltip.hide(),
+            tooltipElement: () => tooltip.el,
         };
     }
 

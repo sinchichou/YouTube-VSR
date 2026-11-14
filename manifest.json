@@ -8,6 +8,10 @@
     "scripting",
     "storage"
   ],
+  "host_permissions": [
+    "*://www.youtube.com/*",
+    "*://www.twitch.tv/*"
+  ],
   "action": {
     "default_popup": "popup.html",
     "default_icon": {

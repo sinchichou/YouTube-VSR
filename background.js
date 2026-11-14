@@ -19,11 +19,105 @@
 
 /** 效果庫索引(由 scripts/sync-wgfx.mjs 產生) */
 const INDEX_PATH = 'wgx/packages.json';
+/** 雙語效果說明(人工維護;key = 去副檔名的基底名稱小寫,或完整 path) */
+const DESC_PATH = 'effect-descriptions.json';
 /** 允許出現在清單中的路徑前綴(白名單;避免索引被竄改後載入任意擴充套件資源) */
 const ALLOWED_PREFIX = { wgx: 'wgx/', wgsl: 'effects_wgsl/' };
 
+/** fetchResource 允許代抓的資源(僅限擴充套件自身的效果檔;不處理其他任何路徑) */
+const RESOURCE_ALLOWLIST = [
+    /^wgx\/[A-Za-z0-9_\-][A-Za-z0-9_\-./]*\.wgx$/i,
+    /^effects_wgsl\/[A-Za-z0-9_\-][A-Za-z0-9_\-./]*\.wgsl$/i,
+];
+
+/** 單次代理回傳的位元組上限(保護訊息通道;現有套件包最大約 1 MB) */
+const MAX_RESOURCE_BYTES = 16 * 1024 * 1024;
+
+/**
+ * Uint8Array → base64(分塊組字串,避免 call stack / 參數數量上限)。
+ * @param {Uint8Array} bytes
+ * @returns {string}
+ */
+function bytesToBase64(bytes) {
+    let bin = '';
+    const CHUNK = 0x8000;
+    for (let i = 0; i < bytes.length; i += CHUNK) {
+        bin += String.fromCharCode.apply(null, bytes.subarray(i, i + CHUNK));
+    }
+    return btoa(bin);
+}
+
+/**
+ * 在背景(擴充套件自己的 origin)代抓擴充套件資源。
+ * ---
+ * 內容腳本直接 fetch chrome-extension:// 資源雖然因 web_accessible_resources
+ * 而成功,但 Blink 會對頁面框架記「Unsafe attempt to load URL … Domains,
+ * protocols and ports must match.」主控台錯誤。改由 service worker 取檔
+ * (無頁面框架)即可消除該警告;內容腳本端在訊息失敗時仍可直接 fetch 後備。
+ * @param {string} path 擴充套件相對路徑
+ * @returns {Promise<{ok: boolean, data?: string, bytes?: number, error?: string}>}
+ */
+async function handleFetchResource(path) {
+    if (typeof path !== 'string' || !RESOURCE_ALLOWLIST.some((re) => re.test(path))) {
+        return { ok: false, error: 'path not allowed' };
+    }
+    try {
+        const url = chrome.runtime.getURL(path);
+        const res = await fetch(url);
+        if (!res.ok) {
+            return { ok: false, error: `HTTP ${res.status}` };
+        }
+        const buf = new Uint8Array(await res.arrayBuffer());
+        if (buf.byteLength > MAX_RESOURCE_BYTES) {
+            return { ok: false, error: `resource too large (${buf.byteLength} bytes)` };
+        }
+        return { ok: true, data: bytesToBase64(buf), bytes: buf.byteLength };
+    } catch (e) {
+        return { ok: false, error: String((e && e.message) || e) };
+    }
+}
+
 /** 索引快取(service worker 重啟後會自動重建) */
 let indexCache = null;
+/** 雙語說明快取:{ byName: {nameLower: {en, zh}}, byPath: {path: {en, zh}} } */
+let descCache = null;
+
+/**
+ * 載入雙語效果說明(容忍檔案缺失 —— 缺失時退回索引自帶的 description)。
+ * @returns {Promise<{byName: object, byPath: object}>}
+ */
+async function loadDescriptions() {
+    if (descCache) return descCache;
+    try {
+        const res = await fetch(chrome.runtime.getURL(DESC_PATH), { cache: 'no-cache' });
+        if (res.ok) {
+            const json = await res.json();
+            descCache = {
+                byName: (json && json.byName) || {},
+                byPath: (json && json.byPath) || {},
+            };
+        } else {
+            console.warn(`[VSR] 效果說明檔 ${DESC_PATH} 不存在(HTTP ${res.status}),改用索引自帶描述。`);
+            descCache = { byName: {}, byPath: {} };
+        }
+    } catch (e) {
+        console.warn('[VSR] 效果說明檔載入失敗,改用索引自帶描述:', (e && e.message) || e);
+        descCache = { byName: {}, byPath: {} };
+    }
+    return descCache;
+}
+
+/**
+ * 查單一效果的雙語說明:先比對完整 path(byPath 覆寫),再比對基底名稱(byName)。
+ * @param {string} path 清單項目路徑
+ * @param {string} baseName 去副檔名的基底名稱
+ * @returns {{en: string, zh: string}|null}
+ */
+function lookupDescription(path, baseName) {
+    const d = descCache;
+    if (!d) return null;
+    return d.byPath[path] || d.byName[String(baseName).toLowerCase()] || null;
+}
 
 /**
  * 讀取並驗證效果庫索引。
@@ -31,6 +125,9 @@ let indexCache = null;
  */
 async function loadLibraryIndex() {
     if (indexCache) return indexCache;
+
+    // 雙語說明先載入(容忍缺失);合併進每個清單項目
+    await loadDescriptions();
 
     const url = chrome.runtime.getURL(INDEX_PATH);
     const res = await fetch(url, { cache: 'no-cache' });
@@ -75,6 +172,9 @@ function toLibraryEntry(raw) {
     if (!raw.path.startsWith(ALLOWED_PREFIX[kind])) return null;
 
     const base = raw.path.split('/').pop().replace(/\.(wgx|wgsl)$/i, '');
+    // 雙語說明:人工維護的 effect-descriptions.json 優先;
+    // byName 未命中時以索引自帶的 description 作為 EN 後備。
+    const desc = lookupDescription(raw.path, base);
     return {
         kind,
         path: raw.path,
@@ -82,6 +182,8 @@ function toLibraryEntry(raw) {
         name: String(raw.name || base),
         family: String(raw.family || 'Other'),
         description: String(raw.description || ''),
+        descEn: (desc && desc.en) || String(raw.description || ''),
+        descZh: (desc && desc.zh) || '',
         tags: Array.isArray(raw.tags) ? raw.tags : [],
         passCount: Number(raw.passCount || 0),
         source: String(raw.source || ''),
@@ -129,6 +231,93 @@ async function getLibraryStatus() {
     }
 }
 
+/**
+ * 主控台橋接(注入頁面 MAIN world 執行)。
+ * ---
+ * DevTools 主控台預設在頁面 context(MAIN world)執行,看不到內容腳本隔離世界
+ * 的物件。本函式以 chrome.scripting.executeScript({world:'MAIN'}) 注入 ——
+ * 由瀏覽器發起的注入可繞過頁面 CSP(<script src=chrome-extension://...> 會被
+ * YouTube 的 script-src 擋下)。注入後頁面可用:
+ *   VSR.status()                      → 狀態快照(Promise)
+ *   VSR.watermark() / watermark(bool) → 查詢 / 開關淺色水印(Promise)
+ *   VSR.enable() / disable() / toggle() → 開關 VSR 本體(Promise)
+ * 通訊方式:CustomEvent('vsr-console-cmd')送往內容腳本,以
+ * CustomEvent('vsr-console-res')帶回結果(跨隔離世界以 structured clone 傳遞)。
+ *
+ * 注意:本函式會被 chrome.scripting 序列化,**不得**參考任何外部變數。
+ */
+function vsrConsoleBridgeMain() {
+    const CMD = 'vsr-console-cmd';
+    const RES = 'vsr-console-res';
+    let seq = 0;
+    const pending = new Map();
+
+    // 回應監聽只註冊一次(重複注入 executeScript 時冪等)
+    if (!window.__vsrBridgeListenerInstalled) {
+        window.addEventListener(RES, (ev) => {
+            const d = ev && ev.detail;
+            if (!d || typeof d.id === 'undefined') return;
+            const p = pending.get(d.id);
+            if (p) {
+                pending.delete(d.id);
+                if (d.ok) p.resolve(d.result);
+                else p.reject(new Error(d.error || 'VSR 指令失敗'));
+            }
+        });
+        window.__vsrBridgeListenerInstalled = true;
+    }
+
+    const send = (command, value) => new Promise((resolve, reject) => {
+        const id = ++seq;
+        pending.set(id, { resolve, reject });
+        window.dispatchEvent(new CustomEvent(CMD, { detail: { id, command, value } }));
+        setTimeout(() => {
+            if (pending.has(id)) {
+                pending.delete(id);
+                reject(new Error('VSR 未回應(內容腳本可能尚未注入;請重新整理分頁)'));
+            }
+        }, 3000);
+    });
+
+    const api = {
+        watermark: (on) => send('watermark', on),
+        enable: () => send('setEnable', true),
+        disable: () => send('setEnable', false),
+        toggle: () => send('toggle'),
+        status: () => send('status'),
+    };
+    try {
+        Object.defineProperty(window, 'VSR', {
+            value: api, configurable: true, writable: false, enumerable: true
+        });
+    } catch (e) {
+        window.VSR = api;
+    }
+    console.info('[VSR] 主控台控制已就緒 — VSR.status() / VSR.watermark(true|false) / VSR.enable() / VSR.disable() / VSR.toggle()');
+}
+
+/**
+ * 在指定分頁的 MAIN world 安裝主控台橋接。
+ * @param {object} sender 來自 content script 的訊息 sender(含 tab.id)
+ * @returns {Promise<{ok: boolean, error?: string}>}
+ */
+async function handleEnsureConsoleBridge(sender) {
+    const tabId = sender && sender.tab && sender.tab.id;
+    if (typeof tabId !== 'number') {
+        return { ok: false, error: 'no-tab' };
+    }
+    try {
+        await chrome.scripting.executeScript({
+            target: { tabId },
+            world: 'MAIN',
+            func: vsrConsoleBridgeMain,
+        });
+        return { ok: true };
+    } catch (e) {
+        return { ok: false, error: String((e && e.message) || e) };
+    }
+}
+
 // 監聽來自 content scripts 或 popup 的訊息
 chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
     // 如果請求是獲取效果庫清單(套件包 + legacy .wgsl)
@@ -144,6 +333,17 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
     // 如果請求是取得索引狀態(供 UI 顯示精確的錯誤原因)
     if (request.command === 'getLibraryStatus') {
         getLibraryStatus().then(sendResponse);
+        return true;
+    }
+    // 內容腳本請求代抓擴充套件資源(.wgx / .wgsl) — 在背景取檔可消除
+    // 頁面框架的「Unsafe attempt to load URL」主控台錯誤
+    if (request.command === 'fetchResource') {
+        handleFetchResource(request.path).then(sendResponse);
+        return true;
+    }
+    // 內容腳本請求在頁面 MAIN world 安裝主控台橋接(window.VSR)
+    if (request.command === 'ensureConsoleBridge') {
+        handleEnsureConsoleBridge(sender).then(sendResponse);
         return true;
     }
     // 如果請求是影片播放結束
