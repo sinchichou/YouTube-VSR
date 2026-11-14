@@ -90,12 +90,12 @@ The parser scans a shader file for special comment lines starting with `//!`. Th
     //!BLOCK_SIZE "16 16"
     ```
 
-### `effects_wgsl/` Directory
+### `effects_wgsl/` Directory (removed)
 
-This directory is intended for shaders written in WGSL (WebGPU Shading Language). It signifies an experimental or future-proofed part of the project, allowing it to leverage the newer WebGPU API for potentially better performance.
-
-It is the **legacy** effect path: effects are preferably shipped as pre-compiled `.wgx` packages
-(see below). Existing `.wgsl` files keep working and stay listed in the library.
+The legacy raw-`.wgsl` effect path has been **removed**: every effect is now shipped
+exclusively as a pre-compiled `.wgx` package (see below). The library, pipeline and
+content-script loader only accept `wgx/**` paths; pipelines saved with old `kind:'wgsl'`
+items are filtered out on restore.
 
 ### WGFX Core Library (ESM dependency)
 
@@ -246,12 +246,11 @@ instance; the popup only ever reads `wgx/packages.json`.
     //!BLOCK_SIZE "16 16"
     ```
 
-### `effects_wgsl/` 目錄
+### `effects_wgsl/` 目錄（已移除）
 
-此目錄用於存放以 WGSL（WebGPU Shading Language）編寫的著色器。它代表了專案中實驗性或為未來做準備的部分，使其能夠利用更新的 WebGPU API 以獲得潛在的更佳效能。
-
-這是**legacy** 效果路徑:效果現在建議以預編套件包 `.wgx` 供應(見下文)。既有的 `.wgsl`
-仍可運作,也會繼續出現在效果庫清單中。
+legacy 的原始 `.wgsl` 效果路徑已**拔除**:效果一律以預編套件包 `.wgx` 供應(見下文)。
+效果庫、管線與內容腳本載入器只接受 `wgx/**` 路徑;舊版儲存的 `kind:'wgsl'` 管線項目
+會在載入設定時自動過濾掉。
 
 ### WGFX 核心庫（ESM 相依）
 

@@ -5,15 +5,15 @@
  * 效果庫資料來源 / Library source:
  *   popup 不自己掃描檔案(也做不到),而是向 background 要清單
  *   (`getShaderFiles`)。該清單由 `scripts/sync-wgfx.mjs` 產生於
- *   `wgx/packages.json`,內容包含:
- *     - `.wgx` 預編套件包(來自 WGFX 的 `npm run pack`),附帶 id / name /
- *       family / description / parameters 中繼資料;
- *     - legacy `.wgsl`(effects_wgsl/ 下既有檔案),仍可被列出與加入管線。
+ *   `wgx/packages.json`,內容為 `.wgx` 預編套件包(來自 WGFX 的
+ *   `npm run pack`),附帶 id / name / family / description / parameters 中繼資料。
+ *   legacy `.wgsl` 路徑已移除:效果一律使用 `.wgx` 套件包。
  *
  * 管線項目形狀 / Pipeline item shape(存進 chrome.storage.local):
- *   { instanceId, kind:'wgx'|'wgsl', path, id, name, family, params, parameterDefs }
- *   其中 `path` + `params` 與舊版相同 —— content.js 只需看這兩個欄位即可相容;
+ *   { instanceId, kind:'wgx', path, id, name, family, params, parameterDefs }
+ *   `path` + `params` 與舊版相同 —— content.js 只需看這兩個欄位即可相容;
  *   `kind` / `id` / `name` / `parameterDefs` 供 UI 顯示與參數面板使用。
+ *   舊版儲存的 `kind:'wgsl'` 項目在 restoreSettings 時會被過濾掉(路徑已拔除)。
  */
 document.addEventListener('DOMContentLoaded', () => {
     // --- DOM 元素 ---
@@ -34,7 +34,7 @@ document.addEventListener('DOMContentLoaded', () => {
     // --- 狀態變數 ---
     let pipeline = []; // 渲染管線中的效果陣列
     let selectedItemId = null;
-    let libraryEntries = []; // 效果庫(套件包 + legacy .wgsl)
+    let libraryEntries = []; // 效果庫(.wgx 套件包)
     let libraryError = ''; // 效果庫為空時的原因說明
     let instanceCounter = 0;
 
@@ -59,7 +59,14 @@ document.addEventListener('DOMContentLoaded', () => {
         const result = await chrome.storage.local.get(['isEnabled', 'pipeline']);
         masterToggle.checked = !!result.isEnabled;
         if (result.pipeline && Array.isArray(result.pipeline)) {
-            pipeline = result.pipeline;
+            // legacy `.wgsl` 路徑已拔除:過濾掉舊版儲存的 wgsl 管線項目
+            const dropped = result.pipeline.filter((it) => it && it.kind === 'wgsl');
+            if (dropped.length > 0) {
+                console.info(`[VSR] 已移除 ${dropped.length} 個 legacy .wgsl 管線項目(效果一律使用 .wgx):`,
+                    dropped.map((d) => d.path));
+                await chrome.storage.local.set({ pipeline: result.pipeline.filter((it) => it && it.kind !== 'wgsl') });
+            }
+            pipeline = result.pipeline.filter((it) => it && it.kind !== 'wgsl');
         }
         renderPipelineUI();
     }
@@ -152,7 +159,7 @@ document.addEventListener('DOMContentLoaded', () => {
         for (const item of list) {
             if (typeof item === 'string') {
                 out.push({
-                    kind: /\.wgx$/i.test(item) ? 'wgx' : 'wgsl',
+                    kind: 'wgx',
                     path: item,
                     id: item,
                     name: baseName(item),
@@ -167,8 +174,9 @@ document.addEventListener('DOMContentLoaded', () => {
                 continue;
             }
             if (!item || typeof item !== 'object' || !item.path) continue;
+            if (item.kind === 'wgsl') continue; // legacy .wgsl 已移除
             out.push({
-                kind: item.kind === 'wgx' ? 'wgx' : 'wgsl',
+                kind: 'wgx',
                 path: String(item.path),
                 id: String(item.id || item.path),
                 name: String(item.name || baseName(item.path)),
@@ -296,10 +304,10 @@ document.addEventListener('DOMContentLoaded', () => {
         return li;
     }
 
-    /** 項目下方的一行中繼資訊:.wgx/.wgsl、pass 數、參數數(完整說明在 tooltip) */
+    /** 項目下方的一行中繼資訊:.wgx、pass 數、參數數(完整說明在 tooltip) */
     function describeEntry(entry) {
-        const bits = [entry.kind === 'wgx' ? '.wgx 套件包' : '.wgsl'];
-        if (entry.kind === 'wgx' && entry.passCount > 0) bits.push(`${entry.passCount} pass`);
+        const bits = ['.wgx 套件包'];
+        if (entry.passCount > 0) bits.push(`${entry.passCount} pass`);
         if (entry.parameters && entry.parameters.length > 0) bits.push(`${entry.parameters.length} 參數`);
         return bits.join(' · ');
     }
@@ -397,13 +405,13 @@ document.addEventListener('DOMContentLoaded', () => {
 
     /**
      * 將效果加入管線。
-     * 參數預設值:`.wgx` 取自索引中繼資料(不必解壓/解析),legacy `.wgsl` 則解析檔案。
+     * 參數預設值取自索引中繼資料(不必解壓/解析 .wgx)。
      * @param {object} entry 效果庫項目
      */
     async function addToPipeline(entry) {
         const newItem = {
             instanceId: `inst_${Date.now()}_${(instanceCounter++).toString(36)}`,
-            kind: entry.kind,
+            kind: 'wgx',
             path: entry.path,
             id: entry.id,
             name: entry.name,
@@ -411,12 +419,7 @@ document.addEventListener('DOMContentLoaded', () => {
             params: {},
         };
 
-        let defs = [];
-        if (entry.kind === 'wgx' && Array.isArray(entry.parameters)) {
-            defs = entry.parameters.map(normalizeParamDef);
-        } else {
-            defs = await readLegacyParamDefs(entry.path);
-        }
+        const defs = Array.isArray(entry.parameters) ? entry.parameters.map(normalizeParamDef) : [];
         newItem.parameterDefs = defs;
         for (const def of defs) newItem.params[def.name] = def.default;
 
@@ -457,8 +460,7 @@ document.addEventListener('DOMContentLoaded', () => {
             const name = document.createElement('span');
             const label = item.name || baseName(item.path);
             name.textContent = `${index + 1}. ${label}`;
-            if (item.kind === 'wgsl') name.title = `${item.path}(legacy .wgsl)`;
-            else name.title = item.id ? `${item.id}\n${item.path}` : item.path;
+            name.title = item.id ? `${item.id}\n${item.path}` : item.path;
             li.appendChild(name);
 
             const removeBtn = document.createElement('button');
@@ -574,12 +576,11 @@ document.addEventListener('DOMContentLoaded', () => {
         }
 
         try {
-            // 優先用加入管線時保存的參數中繼資料(.wgx 由索引提供);
-            // 舊版已存的管線項目沒有這個欄位 → 回頭解析 legacy .wgsl。
-            let defs = Array.isArray(item.parameterDefs) ? item.parameterDefs : null;
-            if (!defs) {
-                defs = await readLegacyParamDefs(item.path);
-                item.parameterDefs = defs; // 快取在項目上,避免重複抓檔
+            // 參數中繼資料在加入管線時由 .wgx 索引提供;
+            // 舊版已存、缺少此欄位的項目 → 沒有可解析的來源,視為無參數。
+            let defs = Array.isArray(item.parameterDefs) ? item.parameterDefs : [];
+            if (!Array.isArray(item.parameterDefs)) {
+                item.parameterDefs = defs; // 快取在項目上
             }
 
             if (defs.length === 0) {
@@ -630,156 +631,8 @@ document.addEventListener('DOMContentLoaded', () => {
         }
     }
 
-    /**
-     * legacy `.wgsl`:抓檔並解析參數(轉成與 .wgx 相同的 defs 形狀)。
-     *
-     * 兩種世代的檔案格式都要支援 / Two generations of files:
-     *   1. Magpie 風格指令區塊(本 repo `effects_wgsl/*.wgsl` 目前全部是這種):
-     *        //! PARAMETER sharpness      (或 `//!PARAMETER` + `//!VAR sharpness`)
-     *        //! LABEL "Sharpness"
-     *        //! MIN 0 / MAX 1 / DEFAULT 0.4 / STEP 0.01
-     *        float sharpness;
-     *   2. 舊版 codegen 的 `var<uniform> ... struct` + `// ui_min=` 註解 → parseUniforms()。
-     */
-    async function readLegacyParamDefs(path) {
-        const code = await loadShaderCode(path);
-        const direct = parseParamDirectives(code);
-        if (direct.length > 0) return direct;
-
-        // 退回 struct 形式(舊版產物)
-        const { uniforms } = parseUniforms(code);
-        return Object.values(uniforms.properties).map(prop => ({
-            name: prop.name,
-            label: prop.name,
-            type: prop.type,
-            default: prop.value,
-            min: prop.min,
-            max: prop.max,
-            step: prop.step,
-        }));
-    }
-
-    /** 指令區塊解析:`//! PARAMETER …` + LABEL/TYPE/MIN/MAX/DEFAULT/STEP(/VAR) */
-    function parseParamDirectives(shaderCode) {
-        const BLOCK_STARTS = new Set(['TEXTURE', 'SAMPLER', 'PASS', 'BUFFER', 'COMMON', 'END']);
-        const defs = [];
-        let cur = null;
-
-        for (const rawLine of String(shaderCode).split(/\r?\n/)) {
-            const line = rawLine.trim();
-            const dir = /^\/\/!\s*([A-Za-z_]+)\s*(.*)$/.exec(line);
-
-            if (!dir) {
-                if (!cur) continue;
-                if (line === '') continue; // 允許宣告前有空行
-                // 非指令行 = 宣告行:名稱若還沒拿到,從 `float name;` 取得
-                if (!cur.name) {
-                    const decl = /(?:float|f32|int|i32|uint|u32|bool)\s+([A-Za-z_]\w*)/.exec(line);
-                    if (decl) cur.name = decl[1];
-                }
-                if (cur.name) defs.push(finalizeParamDef(cur));
-                cur = null;
-                continue;
-            }
-
-            const key = dir[1].toUpperCase();
-            const val = dir[2].trim().replace(/^"|"$/g, '');
-
-            if (key === 'PARAMETER') {
-                if (cur && cur.name) defs.push(finalizeParamDef(cur));
-                cur = { name: val || '', label: '', type: 'float' };
-                continue;
-            }
-            if (!cur) continue;
-            if (BLOCK_STARTS.has(key)) {
-                // 區塊沒有宣告行就結束了(格式不符預期)→ 丟棄該區塊
-                cur = null;
-                continue;
-            }
-            if (key === 'VAR') cur.name = val || cur.name;
-            else if (key === 'LABEL') cur.label = val;
-            else if (key === 'TYPE') cur.type = (val || 'float').toLowerCase();
-            else if (key === 'MIN') cur.min = parseFloat(val);
-            else if (key === 'MAX') cur.max = parseFloat(val);
-            else if (key === 'DEFAULT') cur.default = parseFloat(val);
-            else if (key === 'STEP') cur.step = parseFloat(val);
-        }
-        if (cur && cur.name) defs.push(finalizeParamDef(cur));
-        return defs;
-    }
-
-    function finalizeParamDef(d) {
-        const name = String(d.name).trim();
-        return {
-            name,
-            label: d.label || name,
-            type: d.type || 'float',
-            default: num(d.default, 0),
-            min: num(d.min, 0),
-            max: num(d.max, 1),
-            step: num(d.step, 0.01),
-        };
-    }
-
-    // 載入著色器程式碼 (快取以避免重複載入)
-    const shaderCodeCache = new Map();
-    async function loadShaderCode(path) {
-        if (shaderCodeCache.has(path)) {
-            return shaderCodeCache.get(path);
-        }
-        // The path from background.js is already the full path relative to the extension root.
-        const fullPath = chrome.runtime.getURL(path);
-        const code = await fetch(fullPath).then(res => res.text());
-        shaderCodeCache.set(path, code);
-        return code;
-    }
-
-    // 解析 WGSL 中的 uniform 參數
-    function parseUniforms(shaderCode) {
-        const uniforms = { properties: {}, size: 0, binding: -1 };
-        const uniformRegex = /@group\(0\)\s*@binding\((\d+)\)\s*var<uniform>\s*\w+\s*:\s*(\w+)\s*;/;
-        const uniformMatch = shaderCode.match(uniformRegex);
-
-        if (!uniformMatch) return { uniforms };
-
-        uniforms.binding = parseInt(uniformMatch[1], 10);
-        const structName = uniformMatch[2];
-
-        const structRegex = new RegExp(`struct\s+${structName}\\\s*{([^}]+)}`, 's');
-        const structMatch = shaderCode.match(structRegex);
-
-        if (!structMatch) return { uniforms };
-
-        const membersRegex = /([^;]+);\s*(\/\/.*)?/g;
-        let memberMatch;
-        let currentOffset = 0;
-
-        while ((memberMatch = membersRegex.exec(structMatch[1])) !== null) {
-            const memberLine = memberMatch[1].trim();
-            const comment = memberMatch[2] || '';
-            const parts = memberLine.split(':');
-            if (parts.length < 2) continue;
-
-            const name = parts[0].replace(/@.*/, '').trim();
-            const type = parts[1].trim();
-
-            if (type === 'f32') {
-                const min = /ui_min=([0-9.-]+)/.exec(comment)?.[1] ?? 0.0;
-                const max = /ui_max=([0-9.-]+)/.exec(comment)?.[1] ?? 1.0;
-                const step = /ui_step=([0-9.-]+)/.exec(comment)?.[1] ?? 0.01;
-                const def = /ui_default=([0-9.-]+)/.exec(comment)?.[1] ?? 0.5;
-
-                uniforms.properties[name] = {
-                    name: name, type: 'f32', offset: currentOffset,
-                    value: parseFloat(def), min: parseFloat(min), max: parseFloat(max), step: parseFloat(step),
-                };
-                currentOffset += 4; // f32 is 4 bytes
-            }
-            //未來可擴充支援 vec2, vec3, i32 等
-        }
-        uniforms.size = Math.max(16, Math.ceil(currentOffset / 16) * 16); // 確保最小為 16 bytes 且為 16 的倍數
-        return { uniforms };
-    }
+    // legacy `.wgsl` 參數解析器(parseParamDirectives/parseUniforms/readLegacyParamDefs)
+    // 已隨 legacy 路徑移除 —— 參數一律取自 .wgx 套件包的索引中繼資料。
 
     //================================================================================
     // EVENT LISTENERS & NOTIFIERS
@@ -908,9 +761,6 @@ document.addEventListener('DOMContentLoaded', () => {
             normalizeParamDef,
             renderPipelineUI,
             renderPropertiesUI,
-            parseUniforms,
-            parseParamDirectives,
-            readLegacyParamDefs,
             getState: () => ({ pipeline, libraryEntries, libraryError, selectedItemId }),
             setLibrary: (entries) => { libraryEntries = entries; },
             setPipeline: (items) => { pipeline = items; },

@@ -21,10 +21,10 @@
  *      `wgx/packages.json`。為什麼要這份索引(MV3 限制):
  *        * service worker **無法列舉**擴充套件內的檔案(沒有檔案系統 API),
  *          也沒有「讀取目錄」的 API —— 只有 `chrome.runtime.getURL`(已知路徑→URL)。
- *        * 硬編碼清單是舊版的痛點(6 個路徑 vs 實際 20 個 .wgsl,早就不同步)。
+ *        * 硬編碼清單是舊版的痛點(6 個路徑 vs 實際 127 個 .wgx,早就不同步)。
  *        * 索引是純資料 JSON,service worker(popup/內容腳本同理)一次 fetch 就能
  *          拿到完整且正確的清單,而且在同步時就已驗證過內容。
- *      索引同時收錄 `effects_wgsl/` 下既有的 `.wgsl`(legacy),讓舊效果仍可被列出。
+ *      (legacy `effects_wgsl/*.wgsl` 路徑已移除:效果一律使用 `.wgx` 套件包。)
  *
  * 冪等 / Idempotent:
  *   內容相同就不寫入(檔案逐一比對 sha256;索引比對時忽略 generatedAt)。
@@ -68,10 +68,8 @@ const ARTIFACTS = [
 /** 索引格式版本(欄位結構變動時遞增) */
 const INDEX_VERSION = 1;
 
-/** legacy `.wgsl` 效果的掃描根目錄(相對擴充套件根) */
-const LEGACY_ROOTS = ['effects_wgsl'];
-/** 掃描 legacy 時要略過的目錄名(實作暫存/實驗區,不是可用的效果) */
-const LEGACY_SKIP_DIRS = new Set(['workspace', 'node_modules', '.git']);
+// legacy `.wgsl` 掃描(LEGACY_ROOTS/scanLegacyEffects)已移除:
+// 效果一律使用 `.wgx` 套件包,索引不再收錄 effects_wgsl/。
 
 const argv = process.argv.slice(2);
 const CHECK_ONLY = argv.includes('--check');
@@ -343,53 +341,14 @@ function manifestToEntry(manifest, file, hash, bytes) {
 
 const numOr = (v, d) => (typeof v === 'number' && Number.isFinite(v) ? v : d);
 
-/** 掃描 legacy `.wgsl`(索引用;讓舊效果仍能被列出) */
-function scanLegacyEffects() {
-    const out = [];
-    for (const root of LEGACY_ROOTS) {
-        const abs = path.join(EXT_ROOT, root);
-        if (!fs.existsSync(abs)) continue;
-        const walk = (d) => {
-            let entries;
-            try { entries = fs.readdirSync(d, { withFileTypes: true }); } catch { return; }
-            for (const ent of entries) {
-                if (ent.name.startsWith('.')) continue;
-                const full = path.join(d, ent.name);
-                if (ent.isDirectory()) {
-                    if (!LEGACY_SKIP_DIRS.has(ent.name)) walk(full);
-                    continue;
-                }
-                if (!ent.isFile() || !ent.name.toLowerCase().endsWith('.wgsl')) continue;
-                // 0 byte 的空檔(實作暫存)不是可用效果,排除以免加入管線後失敗
-                if (fs.statSync(full).size === 0) continue;
-                const rel = relPosix(full);
-                const dir = path.posix.dirname(rel);
-                const name = path.basename(rel, '.wgsl');
-                out.push({
-                    kind: 'wgsl',
-                    path: rel,
-                    id: `wgsl:${rel}`,
-                    name,
-                    family: dir && dir !== '.' ? dir.split('/').pop() : 'legacy',
-                    description: '',
-                    parameters: null, // legacy 由 popup 解析檔案內的 //!PARAMETER
-                    hash: sha256(fs.readFileSync(full)),
-                    bytes: fs.statSync(full).size,
-                });
-            }
-        };
-        walk(abs);
-    }
-    out.sort((a, b) => a.path.localeCompare(b.path));
-    return out;
-}
+/** 掃描 legacy `.wgsl` 的函式已移除 —— 索引只收錄 `.wgx` 套件包。 */
 
 // ===========================================================================
 // [C] 索引(packages.json)
 // ===========================================================================
 
 /** 組出索引物件(不含 generatedAt —— 它會沿用既有值以維持冪等) */
-function buildIndex({ packages, legacy, wgfxVersion, bundleHash, pkgSource, staleBundles }) {
+function buildIndex({ packages, wgfxVersion, bundleHash, pkgSource, staleBundles }) {
     const families = {};
     for (const p of packages) families[p.family] = (families[p.family] || 0) + 1;
     return {
@@ -399,10 +358,10 @@ function buildIndex({ packages, legacy, wgfxVersion, bundleHash, pkgSource, stal
         bundleHash,
         packagesSource: pkgSource ? { label: pkgSource.label, dir: pkgSource.dir } : null,
         staleBundles: !!staleBundles,
-        counts: { packages: packages.length, legacy: legacy.length, families: Object.keys(families).length },
+        counts: { packages: packages.length, legacy: 0, families: Object.keys(families).length },
         families,
         packages,
-        legacy,
+        legacy: [], // legacy .wgsl 路徑已移除;欄位保留以維持索引形狀相容
     };
 }
 
@@ -461,7 +420,6 @@ function syncPackages(distDir, version, bundleHash) {
     const prevPackages = new Map(
         (Array.isArray(prevIndex?.packages) ? prevIndex.packages : []).map((p) => [p.path, p])
     );
-    const legacy = scanLegacyEffects();
     const pkgSource = resolvePackagesSource(distDir);
 
     if (!pkgSource) {
@@ -469,7 +427,7 @@ function syncPackages(distDir, version, bundleHash) {
             return {
                 ok: false, staleBundles: true,
                 reason: '找不到 .wgx 套件包來源(請先在 WGFX 執行 `npm run pack`,或設定 WGFX_PACKAGES)',
-                index: prevIndex || buildIndex({ packages: [], legacy, wgfxVersion: version, bundleHash, pkgSource: null, staleBundles: true }),
+                index: prevIndex || buildIndex({ packages: [], wgfxVersion: version, bundleHash, pkgSource: null, staleBundles: true }),
                 wrote: 0, kept: 0, removed: 0,
             };
         }
@@ -478,7 +436,7 @@ function syncPackages(distDir, version, bundleHash) {
         for (const [rel, entry] of prevPackages) {
             if (fs.existsSync(path.join(EXT_ROOT, rel))) kept.push(entry);
         }
-        const index = buildIndex({ packages: kept, legacy, wgfxVersion: version, bundleHash, pkgSource: null, staleBundles: true });
+        const index = buildIndex({ packages: kept, wgfxVersion: version, bundleHash, pkgSource: null, staleBundles: true });
         return { ok: true, index, wrote: 0, kept: kept.length, removed: 0, staleBundles: true };
     }
 
@@ -563,19 +521,17 @@ function syncPackages(distDir, version, bundleHash) {
 
     // ---- 索引 ----
     packages.sort((a, b) => (a.family + '/' + a.name).localeCompare(b.family + '/' + b.name));
-    const index = buildIndex({ packages, legacy, wgfxVersion: version, bundleHash, pkgSource, staleBundles: false });
+    const index = buildIndex({ packages, wgfxVersion: version, bundleHash, pkgSource, staleBundles: false });
 
     if (CHECK_ONLY) {
         const staleFiles = entries.filter(({ entry }) => {
             const dest = path.join(EXT_ROOT, entry.path);
             return !fs.existsSync(dest) || sha256(fs.readFileSync(dest)) !== entry.hash;
         });
-        const legacyChanged = !prevIndex || JSON.stringify(prevIndex.legacy || []) !== JSON.stringify(legacy);
-        if (staleFiles.length || removed.length || legacyChanged || !sameIndex(prevIndex, index)) {
+        if (staleFiles.length || removed.length || !sameIndex(prevIndex, index)) {
             const bits = [];
             if (staleFiles.length) bits.push(`${staleFiles.length} 個套件包不是最新`);
             if (removed.length) bits.push(`${removed.length} 個套件包已從來源移除`);
-            if (legacyChanged) bits.push('legacy 效果清單已變動');
             if (!prevIndex) bits.push('缺少索引 wgx/packages.json');
             return { ok: false, reason: `wgx/ 與來源不同步(${bits.join('、')})`, index, wrote, kept, removed: removed.length, staleBundles: false };
         }
@@ -584,13 +540,13 @@ function syncPackages(distDir, version, bundleHash) {
 
     const prev = prevIndex;
     if (prev && sameIndex(prev, index)) {
-        log(`[sync-wgfx] 索引已是最新(${packages.length} 個套件包、${legacy.length} 個 legacy 效果)— 未寫入。`);
+        log(`[sync-wgfx] 索引已是最新(${packages.length} 個套件包)— 未寫入。`);
         return { ok: true, index: prev, wrote, kept, removed: removed.length, staleBundles: false, unchanged: true };
     }
     index.generatedAt = new Date().toISOString();
     fs.mkdirSync(WGX_DIR, { recursive: true });
     fs.writeFileSync(INDEX_FILE, JSON.stringify(index, null, 2) + '\n');
-    log(`[sync-wgfx] 寫入 wgx/packages.json(${packages.length} 個套件包、${legacy.length} 個 legacy 效果)`);
+    log(`[sync-wgfx] 寫入 wgx/packages.json(${packages.length} 個套件包)`);
     return { ok: true, index, wrote, kept, removed: removed.length, staleBundles: false };
 }
 
@@ -629,7 +585,7 @@ function main() {
         }
         const c = pkgs.index?.counts || {};
         log(`[sync-wgfx] 已是最新:WGFX v${version} bundle ${short(bundle.hash)}、` +
-            `套件包 ${c.packages ?? 0} 個、legacy 效果 ${c.legacy ?? 0} 個。`);
+            `套件包 ${c.packages ?? 0} 個。`);
         return;
     }
 
@@ -645,7 +601,7 @@ function main() {
             source: pkgs.index?.packagesSource ? pkgs.index.packagesSource.label : '(未同步)',
             sourceDir: pkgs.index?.packagesSource ? pkgs.index.packagesSource.dir : null,
             count: packages.length,
-            legacyCount: pkgs.index?.legacy?.length ?? 0,
+            legacyCount: 0, // legacy .wgsl 路徑已移除
             // 聚合雜湊:只反映套件包內容(不含時間戳),供快速判斷是否過期
             indexHash: sha256(JSON.stringify(packages.map((p) => [p.path, p.hash]))),
             staleBundles: !!pkgs.staleBundles,
@@ -664,7 +620,6 @@ function main() {
         `[sync-wgfx] 完成: WGFX v${version} ${short(bundle.hash)}` +
         `\n[sync-wgfx]   套件包: ${c.packages ?? 0} 個(${c.families ?? 0} 個家族)` +
         `｜寫入 ${pkgs.wrote ?? 0}、已是相同內容 ${pkgs.kept ?? 0}、移除 ${pkgs.removed ?? 0}` +
-        `\n[sync-wgfx]   legacy: ${c.legacy ?? 0} 個 .wgsl` +
         (pkgs.staleBundles ? '\n[sync-wgfx]   注意: 這次沒有同步到套件包來源,索引已標記 staleBundles=true。' : '')
     );
 }

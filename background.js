@@ -6,8 +6,7 @@
 //
 // 效果庫清單為什麼要讀索引 / Why the library is index-driven:
 //   MV3 的 service worker **無法列舉**擴充套件內的檔案(沒有檔案系統 API,也沒有
-//   「讀取目錄」的 API)。舊版於此硬編碼 6 條路徑,但實際上有 20 個 .wgsl +
-//   127 個 .wgx 套件包 —— 清單必然與現實脫節。
+//   「讀取目錄」的 API)。舊版於此硬編碼 6 條路徑,但實際上有 127 個 .wgx 套件包 —— 清單必然與現實脫節。
 //   因此改為讀取 `scripts/sync-wgfx.mjs` 在同步時產生的索引 `wgx/packages.json`:
 //   那是同步當下就從每個套件包的 manifest.json 抽出的中繼資料
 //   (id / name / family / description / parameters),清單永遠與實際檔案一致。
@@ -21,13 +20,13 @@
 const INDEX_PATH = 'wgx/packages.json';
 /** 雙語效果說明(人工維護;key = 去副檔名的基底名稱小寫,或完整 path) */
 const DESC_PATH = 'effect-descriptions.json';
-/** 允許出現在清單中的路徑前綴(白名單;避免索引被竄改後載入任意擴充套件資源) */
-const ALLOWED_PREFIX = { wgx: 'wgx/', wgsl: 'effects_wgsl/' };
+/** 允許出現在清單中的路徑前綴(白名單;避免索引被竄改後載入任意擴充套件資源)
+ *  效果一律使用 `.wgx` 套件包 —— legacy `.wgsl` 路徑已移除。 */
+const ALLOWED_PREFIX = { wgx: 'wgx/' };
 
-/** fetchResource 允許代抓的資源(僅限擴充套件自身的效果檔;不處理其他任何路徑) */
+/** fetchResource 允許代抓的資源(僅限擴充套件自身的效果套件包;不處理其他任何路徑) */
 const RESOURCE_ALLOWLIST = [
     /^wgx\/[A-Za-z0-9_\-][A-Za-z0-9_\-./]*\.wgx$/i,
-    /^effects_wgsl\/[A-Za-z0-9_\-][A-Za-z0-9_\-./]*\.wgsl$/i,
 ];
 
 /** 單次代理回傳的位元組上限(保護訊息通道;現有套件包最大約 1 MB) */
@@ -144,10 +143,9 @@ async function loadLibraryIndex() {
     }
 
     const rawPackages = Array.isArray(json.packages) ? json.packages : [];
-    const rawLegacy = Array.isArray(json.legacy) ? json.legacy : [];
     const skipped = [];
     const entries = [];
-    for (const raw of [...rawPackages, ...rawLegacy]) {
+    for (const raw of rawPackages) {
         const entry = toLibraryEntry(raw);
         if (entry) entries.push(entry);
         else skipped.push(raw && raw.path ? raw.path : String(raw));
@@ -168,15 +166,14 @@ async function loadLibraryIndex() {
  */
 function toLibraryEntry(raw) {
     if (!raw || typeof raw.path !== 'string') return null;
-    const kind = raw.kind === 'wgx' ? 'wgx' : 'wgsl';
-    if (!raw.path.startsWith(ALLOWED_PREFIX[kind])) return null;
+    if (!raw.path.startsWith(ALLOWED_PREFIX.wgx)) return null; // 只收 .wgx 套件包
 
-    const base = raw.path.split('/').pop().replace(/\.(wgx|wgsl)$/i, '');
+    const base = raw.path.split('/').pop().replace(/\.wgx$/i, '');
     // 雙語說明:人工維護的 effect-descriptions.json 優先;
     // byName 未命中時以索引自帶的 description 作為 EN 後備。
     const desc = lookupDescription(raw.path, base);
     return {
-        kind,
+        kind: 'wgx',
         path: raw.path,
         id: String(raw.id || raw.path),
         name: String(raw.name || base),
@@ -187,13 +184,13 @@ function toLibraryEntry(raw) {
         tags: Array.isArray(raw.tags) ? raw.tags : [],
         passCount: Number(raw.passCount || 0),
         source: String(raw.source || ''),
-        // `.wgx` 由索引提供參數中繼資料;legacy `.wgsl` 為 null(由 popup 解析檔案)
+        // 參數中繼資料由索引提供(同步時從套件包 manifest.json 抽出)
         parameters: Array.isArray(raw.parameters) ? raw.parameters : null,
     };
 }
 
 /**
- * 效果庫清單(套件包優先,其次 legacy .wgsl)。
+ * 效果庫清單(.wgx 套件包)。
  * @returns {Promise<object[]>}
  */
 async function getShaderFiles() {
@@ -218,7 +215,7 @@ async function getLibraryStatus() {
             counts: json.counts || {},
             families: json.families || {},
             packageCount: entries.filter((e) => e.kind === 'wgx').length,
-            legacyCount: entries.filter((e) => e.kind === 'wgsl').length,
+            legacyCount: 0, // legacy .wgsl 路徑已移除(欄位保留以維持回應形狀相容)
         };
     } catch (e) {
         return {
@@ -320,7 +317,7 @@ async function handleEnsureConsoleBridge(sender) {
 
 // 監聽來自 content scripts 或 popup 的訊息
 chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
-    // 如果請求是獲取效果庫清單(套件包 + legacy .wgsl)
+    // 如果請求是獲取效果庫清單(.wgx 套件包)
     if (request.command === 'getShaderFiles') {
         getShaderFiles()
             .then(sendResponse)
@@ -335,7 +332,7 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
         getLibraryStatus().then(sendResponse);
         return true;
     }
-    // 內容腳本請求代抓擴充套件資源(.wgx / .wgsl) — 在背景取檔可消除
+    // 內容腳本請求代抓擴充套件資源(.wgx 套件包) — 在背景取檔可消除
     // 頁面框架的「Unsafe attempt to load URL」主控台錯誤
     if (request.command === 'fetchResource') {
         handleFetchResource(request.path).then(sendResponse);

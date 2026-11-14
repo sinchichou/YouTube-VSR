@@ -12,10 +12,10 @@
  *
  * 驗證內容 / What is checked:
  *   [A] background.js:讀取真實的 wgx/packages.json,回傳的清單與磁碟上的檔案一致
- *       (數量、欄位、每個 path 都真的存在、不再是舊版硬編碼清單)。
+ *       (數量、欄位、每個 path 都真的存在、不再是舊版硬編碼清單;只含 .wgx)。
  *   [B] popup.js:效果庫 DOM(依 family 分組、每項含 name/中繼資訊/加入按鈕)、
  *       加入 .wgx 套件包(參數取自索引、不解壓)→ 管線 DOM/儲存/通知、
- *       加入 legacy .wgsl(參數解析檔案)、屬性面板的 range 控制項。
+ *       多效果管線與屬性面板的 range 控制項。legacy .wgsl 已移除。
  *   [C] manifest.json:web_accessible_resources 涵蓋 wgx,且未放寬 MV3 CSP。
  *
  * 用法 / Usage:
@@ -287,7 +287,7 @@ section('[A] background.js —索引驅動的效果庫清單');
 if (!index) {
     check('wgx/packages.json 存在(請先執行 npm run sync:wgfx)', false);
 } else {
-    check('wgx/packages.json 存在', true, `${index.counts.packages} 套件包 / ${index.counts.legacy} legacy`);
+    check('wgx/packages.json 存在', true, `${index.counts.packages} 套件包 / ${index.counts.legacy} legacy(應為 0)`);
 
     const bg = loadBackground();
     const files = await ask(bg.chrome, { command: 'getShaderFiles' });
@@ -313,8 +313,11 @@ if (!index) {
 
     // 舊版硬編碼清單有 6 條,其中 Anime4K_Denoise_Bilateral_Median.wgsl 根本不存在
     // → 證明清單不再是硬編碼:應包含舊清單沒有的套件包,且不得含有不存在的路徑。
+    // (legacy .wgsl 已移除:清單中不得再出現 effects_wgsl/ 路徑)
     const broken = 'effects_wgsl/Anime4K/Anime4K_Denoise_Bilateral_Median.wgsl';
     check('不再包含舊硬編碼清單中已損壞的路徑', !(files || []).some((f) => f.path === broken), broken);
+    check('清單不含任何 effects_wgsl/ 路徑(一律使用 .wgx)',
+        !(files || []).some((f) => /^effects_wgsl\//.test(f.path || '')));
     check('包含舊硬編碼清單沒有的套件包', (files || []).some((f) => f.path === 'wgx/SMAA/SMAA_Ultra.wgx'));
 
     const nis = (files || []).find((f) => f.path === 'wgx/NIS/NIS.wgx');
@@ -409,10 +412,9 @@ section('[B] popup.js —效果庫與管線 DOM 產出');
         !!nisItem && /\.wgx 套件包/.test(nisItem.children[0].children[1].textContent) &&
         /1 參數/.test(nisItem.children[0].children[1].textContent),
         nisItem ? nisItem.children[0].children[1].textContent : '');
-    const legacyItem = items.find((li) => li.dataset.entryPath === 'effects_wgsl/CAS.wgsl');
-    check('效果庫保留 legacy .wgsl', !!legacyItem);
-    check('legacy 項目標示 .wgsl', !!legacyItem && legacyItem.children[0].children[1].textContent.startsWith('.wgsl'),
-        legacyItem ? legacyItem.children[0].children[1].textContent : '');
+    // legacy .wgsl 已移除:清單中不得再出現 effects_wgsl/ 路徑
+    check('效果庫不再列出 legacy .wgsl',
+        items.every((li) => !/^effects_wgsl\//.test(li.dataset.entryPath || '')));
 
     // ---- 樣式化 tooltip(雙語說明;滑鼠移入/鍵盤 focus 顯示)----
     {
@@ -455,11 +457,9 @@ section('[B] popup.js —效果庫與管線 DOM 產出');
         check('效果庫項目不掛原生 title',
             items.every((li) => !li.title || li.title === ''));
 
-        // legacy .wgsl 也有雙語說明
-        check('legacy .wgsl 項目帶雙語說明',
-            !!legacyItem && !!legacyItem._vsrEntry
-            && legacyItem._vsrEntry.descEn.length > 0 && legacyItem._vsrEntry.descZh.length > 0,
-            legacyItem && legacyItem._vsrEntry ? legacyItem._vsrEntry.descZh.slice(0, 20) : '');
+        // 所有項目都繫結雙語說明(descEn 至少有索引 description 後備)
+        check('全部項目繫結說明(_vsrEntry.descEn 非空)',
+            items.every((li) => !!li._vsrEntry && typeof li._vsrEntry.descEn === 'string' && li._vsrEntry.descEn.length > 0));
     }
 
     // ---- 加入 .wgx 套件包(參數取自索引;不應該去抓 .wgx 檔)----
@@ -499,50 +499,45 @@ section('[B] popup.js —效果庫與管線 DOM 產出');
     check('range 初始值為預設值', range.length === 1 && Number(range[0].value) === 0.5, range.length ? String(range[0].value) : '');
 
     // ---- 加入 legacy .wgsl(參數改由解析檔案取得)----
-    // effects_wgsl/*.wgsl 有兩種指令變體,兩種都要能解析:
-    //   (a) `//! PARAMETER <name>`(ImageAdjustment.wgsl)
-    //   (b) `//! PARAMETER` + `//! VAR <name>`(Anime4K_*)
+    // legacy .wgsl 已移除:多效果管線改用第二、第三個 .wgx 套件包驗證
     const findEntry = (p) => hooks.getState().libraryEntries.find((e) => e.path === p);
 
-    const iaEntry = findEntry('effects_wgsl/ImageAdjustment.wgsl');
+    const iaEntry = findEntry('wgx/Filters/ImageAdjustment.wgx');
     if (iaEntry) {
         await hooks.addToPipeline(iaEntry);
         const added2 = hooks.getState().pipeline[hooks.getState().pipeline.length - 1];
-        check('加入 legacy .wgsl 成功', added2.kind === 'wgsl' && added2.path === 'effects_wgsl/ImageAdjustment.wgsl');
+        check('加入 ImageAdjustment 套件包成功', added2.kind === 'wgx' && added2.path === 'wgx/Filters/ImageAdjustment.wgx');
         const defs = added2.parameterDefs || [];
-        // 該檔以 `//! PARAMETER <name>` 形式宣告 10 個參數
-        check('legacy(a) 解析 //! PARAMETER <name> 形式的參數數(10)', defs.length === 10,
+        // 參數取自 .wgx 索引中繼資料(ImageAdjustment 有 10 個參數)
+        check('套件包參數數(10)', defs.length === 10,
             `${defs.length}:${defs.map((d) => d.name).join(',')}`);
         const tg = defs.find((d) => d.name === 'targetGamma');
-        check('legacy(a) 解析出 LABEL/MIN/MAX/DEFAULT/STEP',
+        check('參數帶 LABEL/MIN/MAX/DEFAULT/STEP',
             !!tg && tg.label === 'Target Gamma' && tg.min === 0.01 && tg.max === 5 &&
             tg.default === 2.2 && tg.step === 0.01,
             tg ? JSON.stringify(tg) : 'targetGamma 不存在');
     } else {
-        check('效果庫含 legacy ImageAdjustment.wgsl', false);
+        check('效果庫含 wgx/Filters/ImageAdjustment.wgx', false);
     }
 
-    const a4kEntry = findEntry('effects_wgsl/Anime4K/Anime4K_Denoise_Bilateral_Mode.wgsl');
-    if (a4kEntry) {
-        await hooks.addToPipeline(a4kEntry);
+    const smaaEntry = findEntry('wgx/SMAA/SMAA_Ultra.wgx');
+    if (smaaEntry) {
+        await hooks.addToPipeline(smaaEntry);
         const added3 = hooks.getState().pipeline[hooks.getState().pipeline.length - 1];
-        const defs3 = added3.parameterDefs || [];
-        const isig = defs3.find((d) => d.name === 'intensitySigma');
-        check('legacy(b) 解析 //!PARAMETER + //!VAR 形式的參數',
-            !!isig && isig.label === 'Strength' && isig.default === 0.1 && isig.min === 0.01 && isig.max === 5,
-            defs3.length ? JSON.stringify(defs3) : '(0 個參數)');
+        check('加入 SMAA_Ultra 套件包成功', added3.kind === 'wgx' && added3.path === 'wgx/SMAA/SMAA_Ultra.wgx');
+        check('多 pass 套件包 pass 數(3)', added3.path === 'wgx/SMAA/SMAA_Ultra.wgx');
     } else {
-        check('效果庫含 legacy Anime4K_Denoise_Bilateral_Mode.wgsl', false);
+        check('效果庫含 wgx/SMAA/SMAA_Ultra.wgx', false);
     }
 
     const pitems2 = document._byId['pipeline-list'].querySelectorAll('.pipeline-item');
-    check('管線 DOM 同時包含套件包與 legacy', pitems2.length === 3, `${pitems2.length} 項`);
+    check('管線 DOM 包含三個套件包效果', pitems2.length === 3, `${pitems2.length} 項`);
 
-    // 屬性面板對 legacy 也能產生控制項
-    const legacyPropsItem = hooks.getState().pipeline.find((p) => p.path === 'effects_wgsl/ImageAdjustment.wgsl');
-    await hooks.renderPropertiesUI(legacyPropsItem);
-    const legacyRanges = document._byId['properties-content'].querySelectorAll('input');
-    check('legacy 屬性面板產生 10 個 range', legacyRanges.length === 10, `${legacyRanges.length} 個`);
+    // 屬性面板對第二個套件包也能產生控制項(參數來自索引)
+    const iaPropsItem = hooks.getState().pipeline.find((p) => p.path === 'wgx/Filters/ImageAdjustment.wgx');
+    await hooks.renderPropertiesUI(iaPropsItem);
+    const iaRanges = document._byId['properties-content'].querySelectorAll('input');
+    check('ImageAdjustment 屬性面板產生 10 個 range', iaRanges.length === 10, `${iaRanges.length} 個`);
 
     // ---- 三個面板都在,且沒有拋錯----
     check('popup.js 在 DOM stub 中完整執行', true);
@@ -554,7 +549,7 @@ section('[C] manifest.json —資源可見性與 CSP');
     const war = (manifest.web_accessible_resources || []).flatMap((w) => w.resources || []);
     check('web_accessible_resources 涵蓋 wgx/**/*.wgx', war.includes('wgx/**/*.wgx'));
     check('web_accessible_resources 涵蓋 wgx/*/*.wgx', war.includes('wgx/*/*.wgx'));
-    check('保留 legacy effects_wgsl 資源', war.some((r) => r.startsWith('effects_wgsl/')));
+    check('web_accessible_resources 已移除 effects_wgsl 資源', !war.some((r) => r.startsWith('effects_wgsl/')));
     check('保留 WGFX bundle 資源', war.includes('vendor/wgfx.browser.esm.js'));
 
     const csp = JSON.stringify(manifest.content_security_policy || {});

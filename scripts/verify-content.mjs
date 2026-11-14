@@ -98,7 +98,7 @@ r = HOOKS.resolveOutputSize(pkgShaped({ width: 3840, height: 2160 }));
 check('.wgx 套件實例:resourceManager 為直接屬性', !!r && r.width === 3840 && r.height === 2160, JSON.stringify(r));
 
 r = HOOKS.resolveOutputSize(rawShaped({ width: 1920, height: 1080 }));
-check('.wgsl 原始實例:runtime.resourceManager', !!r && r.width === 1920 && r.height === 1080, JSON.stringify(r));
+check('歷史形狀(WGFX runtime.resourceManager)仍可防禦性取得', !!r && r.width === 1920 && r.height === 1080, JSON.stringify(r));
 
 r = HOOKS.resolveOutputSize({ outWidth: 3840.6, outHeight: 2160 });
 check('無 resourceManager 時退回 outWidth/outHeight(取整)', !!r && r.width === 3840 && r.height === 2160, JSON.stringify(r));
@@ -250,10 +250,9 @@ const bgSandbox = {
     }
     {
         const { resp } = await callFetchResource({ command: 'fetchResource', path: 'effects_wgsl/CAS.wgsl' });
-        // effects_wgsl/CAS.wgsl 在白名單內;stub 的 fetch 對非 wgx URL 會丟錯 →
-        // 預期 ok:false 且 error 來自 fetch(而非 path not allowed)
-        check('wgsl 白名單接受(錯誤來自 stub fetch 而非白名單)',
-            !!resp && resp.ok === false && resp.error !== 'path not allowed', resp && resp.error);
+        // legacy .wgsl 路徑已拔除:白名單不再接受 effects_wgsl/**
+        check('wgsl 路徑已被白名單拒絕(一律使用 .wgx)',
+            !!resp && resp.ok === false && resp.error === 'path not allowed', resp && resp.error);
     }
 }
 
@@ -363,8 +362,8 @@ section('[G] manifest.json');
         (manifest.host_permissions || []).includes('*://www.youtube.com/*')
         && (manifest.host_permissions || []).includes('*://www.twitch.tv/*'));
     const war = (manifest.web_accessible_resources || []).flatMap((r) => r.resources || []);
-    check('web_accessible_resources 保留 wgx 與 wgsl(watermark 不受影響的後備路徑)',
-        war.some((r) => r.includes('wgx')) && war.some((r) => r.includes('wgsl')));
+    check('web_accessible_resources 只保留 wgx(wgsl 已拔除)',
+        war.some((r) => r.includes('wgx')) && !war.some((r) => r.includes('wgsl')));
     check('manifest 版本為 MV3', manifest.manifest_version === 3);
 }
 

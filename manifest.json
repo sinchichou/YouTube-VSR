@@ -44,9 +44,7 @@
       "resources": [
         "vendor/wgfx.browser.esm.js",
         "wgx/**/*.wgx",
-        "wgx/*/*.wgx",
-        "effects_wgsl/**/*.wgsl",
-        "effects_wgsl/*.wgsl"
+        "wgx/*/*.wgx"
       ]
     }
   ],

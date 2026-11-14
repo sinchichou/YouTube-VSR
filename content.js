@@ -26,8 +26,9 @@
      *    舊版只找 `wgfx.runtime.resourceManager` — 套件實例沒有 `runtime`,
      *    於是永遠取不到 → Canvas 以影片尺寸配置,而升頻 OUTPUT 是 2x,
      *    每幀 copyTextureToTexture 驗證失敗(3840x2160 → 1920x1080)。
-     *  - 原始 `.wgsl` 實例(WGFX):輸出在 `wgfx.runtime.resourceManager`。
-     * @param {object|null} wgfx WGFX / WGFXPackageInstance
+     *  - （歷史)原始 `.wgsl` 實例(WGFX):輸出在 `wgfx.runtime.resourceManager`。
+     *    legacy .wgsl 路徑已移除,此分支保留以防禦未來的實例形狀。
+     * @param {object|null} wgfx WGFXPackageInstance
      * @returns {{width:number, height:number}|null} 取不到時回傳 null(呼叫端自行後備)
      */
     function resolveOutputSize(wgfx) {
@@ -482,7 +483,7 @@ fn fs(@builtin(position) fragCoord: vec4f) -> @location(0) vec4f {
         }
 
         /**
-         * 載入擴充套件內的資源位元組(.wgx / .wgsl)。
+         * 載入擴充套件內的資源位元組(.wgx 套件包)。
          * ---
          * 舊版在內容腳本(隔離世界)直接 fetch chrome-extension:// URL —— 雖然
          * web_accessible_resources 允許而載入成功,但 Blink 會對每個檔案記一條
@@ -512,25 +513,15 @@ fn fs(@builtin(position) fragCoord: vec4f) -> @location(0) vec4f {
             return new Uint8Array(await resp.arrayBuffer());
         }
 
-        /** 編譯單一效果(.wgx 套件包優先,legacy .wgsl 後備) */
+        /** 編譯單一效果(一律 .wgx 套件包;legacy .wgsl 路徑已移除) */
         async _compileOne(effectPath, width, height, params = {}) {
-            if (effectPath.endsWith('.wgx')) {
-                const bytes = await this.loadExtensionBytes(effectPath);
-                const pkg = await WGFXPackageClass.fromBytes(bytes);
-                const inst = await pkg.createInstance({ device: this.device, width, height });
-                VSRLogger.info(`已載入套件包: ${pkg.manifest.name} (${pkg.manifest.passes.length} passes) @ ${width}x${height}`);
-                inst.updateUniforms(params);
-                return inst;
+            if (!effectPath.endsWith('.wgx')) {
+                throw new Error(`不支援的效果路徑(僅接受 .wgx 套件包): ${effectPath}`);
             }
-            // 原始 .wgsl 路徑(相容後備)
             const bytes = await this.loadExtensionBytes(effectPath);
-            const code = new TextDecoder().decode(bytes);
-            const inst = await WGFXClass.create({
-                device: this.device,
-                effectCode: code,
-                width, height
-            });
-            inst.initialize();
+            const pkg = await WGFXPackageClass.fromBytes(bytes);
+            const inst = await pkg.createInstance({ device: this.device, width, height });
+            VSRLogger.info(`已載入套件包: ${pkg.manifest.name} (${pkg.manifest.passes.length} passes) @ ${width}x${height}`);
             inst.updateUniforms(params);
             return inst;
         }
