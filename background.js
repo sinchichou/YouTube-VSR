@@ -409,6 +409,59 @@ chrome.runtime.onInstalled.addListener(() => {
     });
 });
 
+// ============================================================================
+// 每部影片自動切換配置（configs + videoConfigs 綁定）
+// ---------------------------------------------------------------------------
+// popup/側邊欄的 Configs 面板把「影片鍵 → 配置名」寫進 `videoConfigs`；
+// 導覽到影片頁時在此查表,有綁定就把該配置（管線 + 開關）直接送給 content script
+// —— 不需要開啟面板,換一部影片就自動換配置。
+// 影片鍵語意與 popup.js 的 videoKeyOf 一致:yt:<videoId> / twitch:<頻道>。
+// ============================================================================
+
+/**
+ * 從影片頁 URL 取出穩定的影片鍵(與 popup.js 相同語意)。
+ * @param {string} url
+ * @returns {string|null}
+ */
+function videoKeyOf(url) {
+    if (typeof url !== 'string') return null;
+    try {
+        const u = new URL(url);
+        if (/(^|\.)youtube\.com$/.test(u.hostname) && u.pathname === '/watch') {
+            const v = u.searchParams.get('v');
+            return v ? `yt:${v}` : null;
+        }
+        if (/(^|\.)twitch\.tv$/.test(u.hostname)) {
+            const seg = u.pathname.split('/').filter(Boolean)[0];
+            return seg ? `twitch:${seg.toLowerCase()}` : null;
+        }
+    } catch { /* URL 解析失敗 */ }
+    return null;
+}
+
+/**
+ * 此影片有綁定配置時,把配置(管線 + 開關)送給該分頁的 content script。
+ * @param {number} tabId
+ * @param {string} url
+ */
+async function applyVideoConfigIfBound(tabId, url) {
+    const key = videoKeyOf(url);
+    if (!key) return;
+    try {
+        const stored = await chrome.storage.local.get(['configs', 'videoConfigs']);
+        const configs = (stored.configs && typeof stored.configs === 'object') ? stored.configs : {};
+        const videoConfigs = (stored.videoConfigs && typeof stored.videoConfigs === 'object') ? stored.videoConfigs : {};
+        const name = videoConfigs[key];
+        const cfg = name ? configs[name] : null;
+        if (!cfg || !Array.isArray(cfg.pipeline)) return;
+        await chrome.tabs.sendMessage(tabId, { command: 'setPipeline', pipeline: cfg.pipeline });
+        await chrome.tabs.sendMessage(tabId, { command: 'setEnable', isEnabled: cfg.isEnabled !== false });
+        console.log(`[VSR] 已自動套用影片配置「${name}」(${key})`);
+    } catch (e) {
+        // content script 尚未注入 / 分頁正在切換 — 靜默略過(下次導覽再試)
+    }
+}
+
 // 監聽分頁更新事件
 chrome.tabs.onUpdated.addListener((tabId, changeInfo, tab) => {
     // 檢查 URL 是否為 YouTube 觀看頁面
@@ -423,9 +476,18 @@ chrome.tabs.onUpdated.addListener((tabId, changeInfo, tab) => {
                 }
             });
         }
+        // 每部影片自動切換配置(換影片/重載完成時)
+        if (changeInfo.url || changeInfo.status === 'complete') {
+            applyVideoConfigIfBound(tabId, tab.url);
+        }
         // 啟用擴充功能的圖示
         chrome.action.enable(tabId);
     } else if (tab.url) {
+        // Twitch 頁面(不在 youtube 分支內)也要能每部影片自動切換配置
+        if (/^https:\/\/(www\.)?twitch\.tv\//i.test(tab.url)
+            && (changeInfo.url || changeInfo.status === 'complete')) {
+            applyVideoConfigIfBound(tabId, tab.url);
+        }
         // 如果不是 YouTube 觀看頁面，則禁用圖示
         chrome.action.disable(tabId);
     }

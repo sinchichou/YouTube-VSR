@@ -857,6 +857,174 @@
       body:has(.add-btn:hover, .remove-btn:hover) #vsr-tooltip {
         opacity: 0 !important;
       }
+
+      /* ===== 配置（Configs）面板 ===== */
+      #configs-content {
+        padding: 10px;
+        overflow-y: auto;
+        flex-grow: 1;
+        display: flex;
+        flex-direction: column;
+        gap: 8px;
+      }
+
+      #config-save-row {
+        display: flex;
+        gap: 6px;
+      }
+
+      #config-name-input {
+        flex: 1 1 auto;
+        min-width: 0;
+        background: var(--bg-card, #21262d);
+        color: var(--text-primary, #e6edf3);
+        border: 1px solid var(--border-subtle, rgba(240, 246, 252, 0.1));
+        border-radius: var(--radius-s, 6px);
+        padding: 6px 8px;
+        font-size: 12px;
+        outline: none;
+      }
+
+      #config-name-input:focus {
+        border-color: var(--accent-color, #a371f7);
+      }
+
+      #config-save-btn {
+        flex: 0 0 auto;
+        background: var(--accent-color, #a371f7);
+        color: #fff;
+        border: none;
+        border-radius: var(--radius-s, 6px);
+        padding: 6px 12px;
+        font-size: 12px;
+        font-weight: 600;
+        cursor: pointer;
+      }
+
+      #config-save-btn:hover {
+        filter: brightness(1.15);
+      }
+
+      .config-video-row {
+        font-size: 11px;
+        color: var(--text-secondary, #8b949e);
+        line-height: 1.5;
+        background: rgba(255, 255, 255, 0.03);
+        border-radius: var(--radius-s, 6px);
+        padding: 6px 8px;
+      }
+
+      .config-video-row .config-video-key {
+        color: var(--text-primary, #e6edf3);
+        font-family: ui-monospace, Consolas, monospace;
+        word-break: break-all;
+      }
+
+      .config-video-row .config-bind-btn {
+        background: transparent;
+        color: var(--accent-color, #a371f7);
+        border: 1px solid var(--border-subtle, rgba(240, 246, 252, 0.1));
+        border-radius: 4px;
+        font-size: 11px;
+        padding: 2px 6px;
+        cursor: pointer;
+        margin-left: 4px;
+      }
+
+      .config-video-row .config-bind-btn:hover {
+        background: rgba(163, 113, 247, 0.15);
+      }
+
+      #config-list {
+        list-style: none;
+        margin: 0;
+        padding: 0;
+        display: flex;
+        flex-direction: column;
+        gap: 6px;
+      }
+
+      .config-item {
+        display: flex;
+        align-items: center;
+        gap: 6px;
+        background: var(--bg-card, #21262d);
+        border: 1px solid var(--border-subtle, rgba(240, 246, 252, 0.1));
+        border-radius: var(--radius-s, 6px);
+        padding: 8px 10px;
+      }
+
+      .config-item.active {
+        border-color: var(--accent-color, #a371f7);
+        background: rgba(163, 113, 247, 0.08);
+      }
+
+      .config-item .config-name {
+        flex: 1 1 auto;
+        min-width: 0;
+        overflow: hidden;
+        text-overflow: ellipsis;
+        white-space: nowrap;
+        font-size: 13px;
+        font-weight: 600;
+        color: var(--text-primary, #e6edf3);
+        cursor: pointer;
+      }
+
+      .config-item .config-meta {
+        font-size: 10px;
+        color: var(--text-secondary, #8b949e);
+        flex: 0 0 auto;
+      }
+
+      .config-item .config-apply-btn,
+      .config-item .config-bind-btn,
+      .config-item .config-delete-btn {
+        flex: 0 0 auto;
+        background: transparent;
+        border: 1px solid var(--border-subtle, rgba(240, 246, 252, 0.1));
+        border-radius: 4px;
+        color: var(--text-secondary, #8b949e);
+        font-size: 11px;
+        padding: 3px 7px;
+        cursor: pointer;
+      }
+
+      .config-item .config-apply-btn:hover {
+        color: #fff;
+        background: rgba(163, 113, 247, 0.2);
+        border-color: var(--accent-color, #a371f7);
+      }
+
+      .config-item .config-bind-btn.bound {
+        color: var(--accent-color, #a371f7);
+        border-color: var(--accent-color, #a371f7);
+      }
+
+      .config-item .config-delete-btn:hover {
+        color: var(--danger-color, #f85149);
+        background: rgba(248, 81, 73, 0.15);
+        border-color: var(--danger-color, #f85149);
+      }
+
+      .config-status {
+        font-size: 11px;
+        color: var(--text-secondary, #8b949e);
+        min-height: 1.4em;
+        margin: 0;
+      }
+
+      .config-status.config-ok {
+        color: #7ee787;
+      }
+
+      .config-empty {
+        font-size: 12px;
+        color: var(--text-secondary, #8b949e);
+        font-style: italic;
+        text-align: center;
+        padding: 10px 0;
+      }
     </style>
   </head>
   <body>
@@ -899,6 +1067,21 @@
             <span>⚙️</span>
             Select an effect
           </p>
+        </div>
+      </div>
+
+      <div class="panel" id="configs-panel">
+        <h3>Configs</h3>
+        <div id="configs-content">
+          <div id="config-save-row">
+            <input id="config-name-input" type="text" placeholder="配置名稱…" maxlength="60" />
+            <button id="config-save-btn" type="button" title="把目前的管線與開關狀態存成配置">
+              儲存
+            </button>
+          </div>
+          <div id="config-video-row" class="config-video-row"></div>
+          <ul id="config-list"></ul>
+          <p id="config-status" class="config-status"></p>
         </div>
       </div>
     </div>

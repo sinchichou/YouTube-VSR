@@ -4,10 +4,10 @@
     // =========================================================================
     const mainContainer = document.getElementById('main-container');
     if (mainContainer) {
-        const DEFAULT_ORDER = ['shader-library', 'pipeline-container', 'properties-panel'];
+        const DEFAULT_ORDER = ['shader-library', 'pipeline-container', 'properties-panel', 'configs-panel'];
         const DEFAULT_WEIGHTS = {
-            popup: { 'shader-library': 288, 'pipeline-container': 280, 'properties-panel': 232 },
-            side:  { 'shader-library': 38,  'pipeline-container': 34,  'properties-panel': 28  }
+            popup: { 'shader-library': 288, 'pipeline-container': 280, 'properties-panel': 232, 'configs-panel': 220 },
+            side:  { 'shader-library': 32,  'pipeline-container': 30,  'properties-panel': 26,  'configs-panel': 24 }
         };
 
         const isSidePanel = () => document.body.classList.contains('side-panel');

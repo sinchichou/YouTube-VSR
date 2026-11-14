@@ -52,6 +52,9 @@ document.addEventListener('DOMContentLoaded', () => {
         await restoreSettings();
         setupEventListeners();
         setupPanelModeButton();
+        setupConfigsUI();
+        await loadConfigsState();
+        renderConfigsUI();
     }
 
     // 從儲存中恢復設定
@@ -116,6 +119,252 @@ document.addEventListener('DOMContentLoaded', () => {
                 await chrome.sidePanel.setOptions({ enabled: false }); // 收起側邊欄
             } catch (e) { /* 忽略：本來就沒開 */ }
             panelModeBtn.textContent = '✓ 已切回快顯模式';
+        }
+    }
+
+    //================================================================================
+    // CONFIGS（具名配置：儲存 / 套用 / 每部影片綁定自動切換）
+    //================================================================================
+
+    let configs = {};        // name → { pipeline, isEnabled, updatedAt }
+    let videoConfigs = {};   // videoKey → config name（每部影片綁定）
+    let currentVideo = null; // { key, url } | null（目前分頁的影片）
+
+    /**
+     * 從影片頁 URL 取出穩定的影片鍵。
+     * YouTube: `yt:<videoId>`（/watch?v=…）；Twitch: `twitch:<頻道>`。
+     * @param {string} url
+     * @returns {string|null}
+     */
+    function videoKeyOf(url) {
+        if (typeof url !== 'string') return null;
+        try {
+            const u = new URL(url);
+            if (/(^|\.)youtube\.com$/.test(u.hostname) && u.pathname === '/watch') {
+                const v = u.searchParams.get('v');
+                return v ? `yt:${v}` : null;
+            }
+            if (/(^|\.)twitch\.tv$/.test(u.hostname)) {
+                const seg = u.pathname.split('/').filter(Boolean)[0];
+                return seg ? `twitch:${seg.toLowerCase()}` : null;
+            }
+        } catch { /* URL 解析失敗 */ }
+        return null;
+    }
+
+    /** 載入配置狀態 + 偵測目前分頁影片；此影片有綁定配置時直接自動套用 */
+    async function loadConfigsState() {
+        const r = await chrome.storage.local.get(['configs', 'videoConfigs']);
+        configs = (r.configs && typeof r.configs === 'object') ? r.configs : {};
+        videoConfigs = (r.videoConfigs && typeof r.videoConfigs === 'object') ? r.videoConfigs : {};
+        try {
+            const tabs = await chrome.tabs.query({ active: true, currentWindow: true });
+            const tab = Array.isArray(tabs) ? tabs[0] : null;
+            const key = tab ? videoKeyOf(tab.url) : null;
+            currentVideo = key ? { key, url: tab.url } : null;
+        } catch {
+            currentVideo = null;
+        }
+
+        // 「每部影片切換配置」的核心:此影片綁定了配置 → 開啟面板時自動套用
+        const boundName = currentVideo ? videoConfigs[currentVideo.key] : null;
+        if (boundName && configs[boundName]) {
+            await applyConfig(boundName, { silent: true });
+            setConfigStatus(`已自動套用此影片的配置「${boundName}」。`, true);
+        }
+    }
+
+    /** 把目前的管線 + 開關狀態存成具名配置 */
+    async function saveCurrentAsConfig(name) {
+        const trimmed = String(name || '').trim();
+        if (!trimmed) {
+            setConfigStatus('請先輸入配置名稱。', false);
+            return false;
+        }
+        configs[trimmed] = {
+            pipeline: JSON.parse(JSON.stringify(pipeline)),
+            isEnabled: !!masterToggle.checked,
+            updatedAt: new Date().toISOString(),
+        };
+        await chrome.storage.local.set({ configs });
+        renderConfigsUI();
+        setConfigStatus(`已儲存配置「${trimmed}」（${pipeline.length} 個效果）。`, true);
+        return true;
+    }
+
+    /** 套用配置:取代目前管線與開關,並通知 content.js */
+    async function applyConfig(name, { silent = false } = {}) {
+        const cfg = configs[name];
+        if (!cfg || !Array.isArray(cfg.pipeline)) {
+            setConfigStatus(`配置「${name}」不存在。`, false);
+            return false;
+        }
+        pipeline = JSON.parse(JSON.stringify(cfg.pipeline));
+        masterToggle.checked = !!cfg.isEnabled;
+        selectedItemId = null;
+        await chrome.storage.local.set({ pipeline, isEnabled: masterToggle.checked });
+        await notifyContent({ command: 'setPipeline', pipeline });
+        await notifyContent({ command: 'setEnable', isEnabled: masterToggle.checked });
+        renderPipelineUI();
+        renderConfigsUI();
+        if (!silent) setConfigStatus(`已套用配置「${name}」（${pipeline.length} 個效果）。`, true);
+        return true;
+    }
+
+    /** 刪除配置(同時清掉指向它的影片綁定) */
+    async function deleteConfig(name) {
+        if (!configs[name]) return false;
+        delete configs[name];
+        for (const k of Object.keys(videoConfigs)) {
+            if (videoConfigs[k] === name) delete videoConfigs[k];
+        }
+        await chrome.storage.local.set({ configs, videoConfigs });
+        renderConfigsUI();
+        setConfigStatus(`已刪除配置「${name}」。`, true);
+        return true;
+    }
+
+    /** 綁定 / 解除綁定目前影片的配置（name=null 解除；綁定後開啟影片自動套用） */
+    async function bindVideoConfig(name) {
+        if (!currentVideo) {
+            setConfigStatus('目前分頁不是支援的影片頁。', false);
+            return false;
+        }
+        if (!name || !configs[name]) {
+            delete videoConfigs[currentVideo.key];
+            setConfigStatus('已解除此影片的配置綁定。', true);
+        } else {
+            videoConfigs[currentVideo.key] = name;
+            setConfigStatus(`此影片已綁定配置「${name}」— 之後開啟影片會自動套用。`, true);
+        }
+        await chrome.storage.local.set({ videoConfigs });
+        renderConfigsUI();
+        return true;
+    }
+
+    function setConfigStatus(msg, ok) {
+        const el = document.getElementById('config-status');
+        if (!el) return;
+        el.textContent = msg;
+        el.classList.toggle('config-ok', ok === true);
+    }
+
+    /** 儲存列接線（名稱輸入 + 儲存鈕 / Enter） */
+    function setupConfigsUI() {
+        const saveBtn = document.getElementById('config-save-btn');
+        const nameInput = document.getElementById('config-name-input');
+        if (!saveBtn || !nameInput) return;
+        const doSave = () => {
+            saveCurrentAsConfig(nameInput.value);
+            nameInput.value = '';
+        };
+        saveBtn.addEventListener('click', doSave);
+        nameInput.addEventListener('keydown', (e) => {
+            if (e.key === 'Enter') doSave();
+        });
+    }
+
+    /** 渲染配置清單與「此影片」列（純 DOM API,測試 stub 相容） */
+    function renderConfigsUI() {
+        const list = document.getElementById('config-list');
+        const videoRow = document.getElementById('config-video-row');
+        if (!list) return;
+
+        // ---- 此影片列 ----
+        if (videoRow) {
+            videoRow.textContent = '';
+            if (currentVideo) {
+                const bound = videoConfigs[currentVideo.key] || null;
+                const label = document.createElement('span');
+                label.textContent = '此影片：';
+                const keySpan = document.createElement('span');
+                keySpan.className = 'config-video-key';
+                keySpan.textContent = currentVideo.key;
+                videoRow.appendChild(label);
+                videoRow.appendChild(keySpan);
+                if (bound) {
+                    const info = document.createElement('span');
+                    info.textContent = ` — 綁定「${bound}」`;
+                    videoRow.appendChild(info);
+                    const unbindBtn = document.createElement('button');
+                    unbindBtn.type = 'button';
+                    unbindBtn.className = 'config-bind-btn';
+                    unbindBtn.textContent = '解除綁定';
+                    unbindBtn.addEventListener('click', () => bindVideoConfig(null));
+                    videoRow.appendChild(unbindBtn);
+                }
+            } else {
+                const hint = document.createElement('span');
+                hint.textContent = '目前分頁不是支援的影片頁（YouTube /watch 或 Twitch）。';
+                videoRow.appendChild(hint);
+            }
+        }
+
+        // ---- 配置清單 ----
+        list.textContent = '';
+        const names = Object.keys(configs).sort(
+            (a, b) => String(configs[b].updatedAt || '').localeCompare(String(configs[a].updatedAt || ''))
+        );
+        if (names.length === 0) {
+            const empty = document.createElement('li');
+            empty.className = 'config-empty';
+            empty.textContent = '還沒有配置 — 調好管線後取個名字按「儲存」。';
+            list.appendChild(empty);
+            return;
+        }
+        const currentJson = JSON.stringify(pipeline);
+        for (const name of names) {
+            const cfg = configs[name];
+            const li = document.createElement('li');
+            li.className = 'config-item';
+            li.dataset.configName = name;
+            // 內容與目前管線一致 → 標記為使用中
+            if (JSON.stringify(cfg.pipeline) === currentJson) li.classList.add('active');
+
+            const nameSpan = document.createElement('span');
+            nameSpan.className = 'config-name';
+            nameSpan.textContent = name;
+            nameSpan.title = '點擊套用此配置';
+            nameSpan.addEventListener('click', () => applyConfig(name));
+
+            const meta = document.createElement('span');
+            meta.className = 'config-meta';
+            const count = Array.isArray(cfg.pipeline) ? cfg.pipeline.length : 0;
+            meta.textContent = `${count} 效果`;
+
+            const applyBtn = document.createElement('button');
+            applyBtn.type = 'button';
+            applyBtn.className = 'config-apply-btn';
+            applyBtn.textContent = '套用';
+            applyBtn.addEventListener('click', () => applyConfig(name));
+
+            li.appendChild(nameSpan);
+            li.appendChild(meta);
+            li.appendChild(applyBtn);
+
+            // 每部影片綁定（僅在影片頁顯示）
+            if (currentVideo) {
+                const isBound = videoConfigs[currentVideo.key] === name;
+                const bindBtn = document.createElement('button');
+                bindBtn.type = 'button';
+                bindBtn.className = 'config-bind-btn' + (isBound ? ' bound' : '');
+                bindBtn.textContent = isBound ? '已綁此影片' : '綁此影片';
+                bindBtn.title = isBound
+                    ? '點擊解除此影片的綁定'
+                    : '此影片開啟時自動套用這個配置';
+                bindBtn.addEventListener('click', () => bindVideoConfig(isBound ? null : name));
+                li.appendChild(bindBtn);
+            }
+
+            const delBtn = document.createElement('button');
+            delBtn.type = 'button';
+            delBtn.className = 'config-delete-btn';
+            delBtn.textContent = '刪除';
+            delBtn.title = '刪除此配置（同時解除相關影片綁定）';
+            delBtn.addEventListener('click', () => deleteConfig(name));
+            li.appendChild(delBtn);
+
+            list.appendChild(li);
         }
     }
 
@@ -764,6 +1013,18 @@ document.addEventListener('DOMContentLoaded', () => {
             getState: () => ({ pipeline, libraryEntries, libraryError, selectedItemId }),
             setLibrary: (entries) => { libraryEntries = entries; },
             setPipeline: (items) => { pipeline = items; },
+            // configs 測試接縫
+            videoKeyOf,
+            loadConfigsState,
+            saveCurrentAsConfig,
+            applyConfig,
+            deleteConfig,
+            bindVideoConfig,
+            renderConfigsUI,
+            setMasterToggle: (v) => { masterToggle.checked = !!v; },
+            getConfigsState: () => ({ configs, videoConfigs, currentVideo }),
+            setConfigs: (c, v) => { configs = c || {}; videoConfigs = v || {}; },
+            setCurrentVideo: (v) => { currentVideo = v; },
             showTooltip: (entry, anchor) => tooltip.show(entry, anchor),
             hideTooltip: () => tooltip.hide(),
             tooltipElement: () => tooltip.el,

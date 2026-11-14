@@ -53,7 +53,13 @@ function createElement(tag) {
         parentNode: null,
         className: '',
         _classes: new Set(),
-        textContent: '',
+        _textContent: '',
+        get textContent() { return this._textContent; },
+        set textContent(v) {
+            // 比照真實 DOM:設定 textContent 會清掉所有子節點
+            this._textContent = String(v);
+            this.children.length = 0;
+        },
         _innerHTML: '',
         title: '',
         draggable: false,
@@ -66,6 +72,12 @@ function createElement(tag) {
         add: (...cs) => cs.forEach((c) => el._classes.add(c)),
         remove: (...cs) => cs.forEach((c) => el._classes.delete(c)),
         contains: (c) => el._classes.has(c),
+        toggle: (c, force) => {
+            const has = el._classes.has(c);
+            const want = force === undefined ? !has : !!force;
+            if (want) el._classes.add(c); else el._classes.delete(c);
+            return want;
+        },
         toString: () => [...el._classes].join(' '),
     };
     Object.defineProperty(el, 'innerHTML', {
@@ -100,10 +112,18 @@ function descendants(el, out = []) {
     return out;
 }
 
-/** 單一簡單選擇器:.class、[data-x="v"]、tag */
+/** 單一簡單選擇器:#id、.class、複合 .a.b/#i.a、[data-x="v"]、tag */
 function matchesSimple(el, sel) {
     const s = String(sel).trim();
-    if (s.startsWith('.')) return el._classes.has(s.slice(1));
+    // 複合 id/class 選擇器(可混用,如 '#config-list'、'.config-bind-btn.bound')
+    if (/^[.#][\w-]+(?:[.#][\w-]+)*$/.test(s)) {
+        let ok = true;
+        for (const t of s.match(/[.#][\w-]+/g)) {
+            if (t[0] === '#') ok = ok && el.id === t.slice(1);
+            else ok = ok && el._classes.has(t.slice(1));
+        }
+        return ok;
+    }
     const attr = /^\[([\w-]+)(?:=["']?([^"'\]]*)["']?)?\]$/.exec(s);
     if (attr) {
         const key = attr[1].replace(/^data-/, '').replace(/-([a-z])/g, (m, c) => c.toUpperCase());
@@ -133,7 +153,8 @@ function matches(el, sel) {
 
 /** 建立一份新的 document stub,並預先放好 popup.html 的四個節點 */
 function createDocument() {
-    const ids = ['library-content', 'pipeline-list', 'properties-content', 'master-toggle'];
+    const ids = ['library-content', 'pipeline-list', 'properties-content', 'master-toggle',
+        'configs-content', 'config-list', 'config-video-row', 'config-status'];
     const byId = {};
     const doc = {
         _domReady: [],
@@ -202,11 +223,16 @@ function createChrome({ storage = {}, sent = [], withSidePanel = true } = {}) {
             },
         },
         tabs: {
-            query: (_q, cb) => { cb([{ id: 1, url: 'https://www.youtube.com/watch?v=x' }]); },
+            // 雙模式:callback 與 Promise 都支援(真 Chrome 回 Promise;舊測試用 callback)
+            query: (_q, cb) => {
+                const r = [{ id: 1, url: 'https://www.youtube.com/watch?v=x' }];
+                if (typeof cb === 'function') cb(r);
+                return Promise.resolve(r);
+            },
             get: (id, cb) => cb({ id, url: 'https://www.youtube.com/watch?v=x' }),
             sendMessage: (id, msg) => { sent.push({ id, msg }); return Promise.resolve(); },
-            onUpdated: { addListener: () => {} },
-            onActivated: { addListener: () => {} },
+            onUpdated: { addListener: (fn) => { chrome._tabUpdated = fn; } },
+            onActivated: { addListener: (fn) => { chrome._tabActivated = fn; } },
         },
         action: {
             enable: () => {},
@@ -255,6 +281,7 @@ function loadBackground() {
         fetch: diskFetch,
         setTimeout,
         clearTimeout,
+         URL,
     };
     vm.createContext(sandbox);
     vm.runInContext(fs.readFileSync(path.join(EXT_ROOT, 'background.js'), 'utf8'), sandbox,
@@ -364,6 +391,7 @@ section('[B] popup.js —效果庫與管線 DOM 產出');
         fetch: diskFetch,
         setTimeout,
         clearTimeout,
+         URL,
         URLSearchParams,
         location: { search: '' },
         __VSR_POPUP_TEST__: true,
@@ -597,6 +625,7 @@ section('[D] popup → content 訊息失敗時的行為(重載後接收端不存
         fetch: diskFetch,
         setTimeout,
         clearTimeout,
+         URL,
         URLSearchParams,
         location: { search: '' },
         __VSR_POPUP_TEST__: true,
@@ -702,6 +731,7 @@ section('[E] 面板位置（快顯 ⇄ 側邊欄；選擇性功能）');
             fetch: diskFetch,
             setTimeout,
             clearTimeout,
+            URL,
         };
         vm.createContext(sandbox);
         vm.runInContext(fs.readFileSync(path.join(EXT_ROOT, 'background.js'), 'utf8'), sandbox,
@@ -712,6 +742,162 @@ section('[E] 面板位置（快顯 ⇄ 側邊欄；選擇性功能）');
         await new Promise((r) => setTimeout(r, 10));
         check('無 sidePanel API 時 panelMode 變更不拋錯也不動作',
             chromeNoSP._spOptions.length === 0 && chromeNoSP._spBehavior.length === 0);
+    }
+}
+
+section('[F] 配置（Configs）—儲存 / 套用 / 每部影片綁定自動切換');
+{
+    // ---- [F1] videoKeyOf:影片鍵抽取 ----
+    {
+        const bg2 = loadBackground();
+        const doc2 = createDocument();
+        const sandbox2 = {
+            document: doc2,
+            chrome: bg2.chrome,
+            console: { log: () => {}, warn: () => {}, error: () => {}, info: () => {} },
+            fetch: diskFetch,
+            setTimeout,
+            clearTimeout,
+             URL,
+            URLSearchParams,
+            location: { search: '' },
+            __VSR_POPUP_TEST__: true,
+        };
+        vm.createContext(sandbox2);
+        vm.runInContext(fs.readFileSync(path.join(EXT_ROOT, 'popup.js'), 'utf8'), sandbox2,
+            { filename: 'popup.js' });
+        for (const fn of doc2._domReady) fn();
+        const hooks2 = sandbox2.__VSR_POPUP_HOOKS__;
+        const vk = hooks2.videoKeyOf;
+        check('videoKeyOf:YouTube /watch?v= → yt:<id>',
+            vk('https://www.youtube.com/watch?v=dQw4w9WgXcQ&t=1') === 'yt:dQw4w9WgXcQ');
+        check('videoKeyOf:Twitch 頻道 → twitch:<頻道小寫>',
+            vk('https://www.twitch.tv/SomeChannel') === 'twitch:somechannel');
+        check('videoKeyOf:非影片頁 → null',
+            vk('https://www.youtube.com/feed/subscriptions') === null && vk('about:blank') === null);
+    }
+
+    // ---- [F2] 儲存 / 套用 / 刪除 / 綁定(popup 行為) ----
+    {
+        const bg = loadBackground();
+        const storage = {};
+        const sent = [];
+        const popupChrome = createChrome({ storage, sent });
+        wireSendMessage(popupChrome, bg.chrome);
+        const document = createDocument();
+        const sandbox = {
+            document,
+            chrome: popupChrome,
+            console: { log: () => {}, warn: () => {}, error: () => {}, info: () => {} },
+            fetch: diskFetch,
+            setTimeout,
+            clearTimeout,
+             URL,
+            URLSearchParams,
+            location: { search: '' },
+            __VSR_POPUP_TEST__: true,
+        };
+        vm.createContext(sandbox);
+        vm.runInContext(fs.readFileSync(path.join(EXT_ROOT, 'popup.js'), 'utf8'), sandbox,
+            { filename: 'popup.js' });
+        for (const fn of document._domReady) fn();
+        const hooks = sandbox.__VSR_POPUP_HOOKS__;
+        // 等 initialize 完成(它會查 active tab → stub 回 youtube watch → currentVideo=yt:x)
+        await new Promise((r) => setTimeout(r, 50));
+        const st0 = hooks.getState();
+        void st0;
+
+        // 儲存:目前管線(空)+ 開關 off → configs 寫入
+        check('儲存空名稱被拒', await hooks.saveCurrentAsConfig('   ') === false);
+        hooks.setPipeline([{ instanceId: 'i1', kind: 'wgx', path: 'wgx/CAS/CAS.wgx', params: { strength: 0.5 }, parameterDefs: [] }]);
+        hooks.setMasterToggle(true);
+        check('儲存配置成功', await hooks.saveCurrentAsConfig('銳化') === true);
+        const saved = (storage.configs || {})['銳化'];
+        check('配置寫入 storage(管線 + 開關)',
+            !!saved && Array.isArray(saved.pipeline) && saved.pipeline.length === 1 && saved.isEnabled === true,
+            JSON.stringify(saved || null));
+
+        // 改變現場狀態 → 套用配置 → 恢復
+        hooks.setPipeline([]);
+        hooks.setMasterToggle(false);
+        check('套用配置成功', await hooks.applyConfig('銳化') === true);
+        check('套用後管線恢復', hooks.getState().pipeline.length === 1
+            && hooks.getState().pipeline[0].path === 'wgx/CAS/CAS.wgx');
+        check('套用已通知 content(setPipeline + setEnable)',
+            sent.some((m) => m.msg.command === 'setPipeline' && m.msg.pipeline.length === 1)
+            && sent.some((m) => m.msg.command === 'setEnable' && m.msg.isEnabled === true));
+        check('套用已寫回 live storage',
+            Array.isArray(storage.pipeline) && storage.pipeline.length === 1 && storage.isEnabled === true);
+        const activeRow = document.querySelectorAll('.config-item.active');
+        check('配置清單標記使用中(.active)', activeRow.length === 1
+            && activeRow[0].dataset.configName === '銳化');
+
+        // 綁定目前影片(stub 的 active tab = youtube watch?v=x → yt:x)
+        check('綁定目前影片成功', await hooks.bindVideoConfig('銳化') === true);
+        check('videoConfigs 寫入 storage(yt:x → 銳化)',
+            (storage.videoConfigs || {})['yt:x'] === '銳化', JSON.stringify(storage.videoConfigs || {}));
+        check('配置列顯示已綁標記',
+            document.querySelectorAll('.config-item .config-bind-btn.bound').length === 1);
+
+        // 自動套用:重置現場 → loadConfigsState 查到綁定 → 自動套用
+        hooks.setPipeline([]);
+        hooks.setMasterToggle(false);
+        sent.length = 0;
+        await hooks.loadConfigsState();
+        check('載入時自動套用綁定配置(每部影片切換)',
+            hooks.getState().pipeline.length === 1
+            && sent.some((m) => m.msg.command === 'setPipeline'));
+        const statusEl = document.getElementById('config-status');
+        check('狀態列顯示自動套用訊息', !!statusEl && /自動套用/.test(statusEl.textContent || ''));
+
+        // 解除綁定 + 刪除(連帶清綁定)
+        check('解除綁定成功', await hooks.bindVideoConfig(null) === true);
+        check('videoConfigs 已清空', Object.keys(storage.videoConfigs || {}).length === 0);
+        await hooks.bindVideoConfig('銳化'); // 重新綁,測刪除連帶清理
+        check('刪除配置成功', await hooks.deleteConfig('銳化') === true);
+        check('刪除後 configs 與 videoConfigs 都清掉',
+            !((storage.configs || {})['銳化']) && Object.keys(storage.videoConfigs || {}).length === 0);
+        const listAfter = document.querySelectorAll('#config-list .config-item');
+        check('刪除後配置清單為空(顯示空狀態)', listAfter.length === 0
+            && !!document.querySelector('#config-list .config-empty'));
+    }
+
+    // ---- [F3] background:導覽到影片頁 → 有綁定就自動送配置 ----
+    {
+        const storage = {
+            configs: { A: { pipeline: [{ instanceId: 'x', kind: 'wgx', path: 'wgx/CAS/CAS.wgx', params: {} }], isEnabled: true, updatedAt: '' } },
+            videoConfigs: { 'yt:abc': 'A', 'twitch:chan': 'A' },
+        };
+        const sent = [];
+        const chromeRec = createChrome({ storage, sent });
+        // 註冊 background 監聽器到這個可觀察的 chrome 上:重新執行 background.js
+        const sandbox = {
+            chrome: chromeRec,
+            console: { log: () => {}, warn: () => {}, error: () => {}, info: () => {} },
+            fetch: diskFetch,
+            setTimeout,
+            clearTimeout,
+            URL,
+        };
+        vm.createContext(sandbox);
+        vm.runInContext(fs.readFileSync(path.join(EXT_ROOT, 'background.js'), 'utf8'), sandbox,
+            { filename: 'background.js' });
+        chromeRec._tabUpdated(7, { status: 'complete' }, { url: 'https://www.youtube.com/watch?v=abc' });
+        await new Promise((r) => setTimeout(r, 20));
+        check('導覽到綁定影片(YouTube)→ 自動送 setPipeline + setEnable',
+            sent.some((m) => m.msg.command === 'setPipeline' && m.id === 7 && Array.isArray(m.msg.pipeline))
+            && sent.some((m) => m.msg.command === 'setEnable' && m.msg.isEnabled === true),
+            JSON.stringify(sent.map((s) => s.msg.command)));
+        sent.length = 0;
+        chromeRec._tabUpdated(8, { url: 'https://www.twitch.tv/chan' }, { url: 'https://www.twitch.tv/chan' });
+        await new Promise((r) => setTimeout(r, 20));
+        check('導覽到綁定頻道(Twitch)→ 同樣自動套用',
+            sent.some((m) => m.msg.command === 'setPipeline' && m.id === 8));
+        sent.length = 0;
+        chromeRec._tabUpdated(9, { status: 'complete' }, { url: 'https://www.youtube.com/watch?v=unbound' });
+        await new Promise((r) => setTimeout(r, 20));
+        check('未綁定的影片 → 不送任何配置訊息', sent.length === 0,
+            JSON.stringify(sent.map((s) => s.msg.command)));
     }
 }
 
