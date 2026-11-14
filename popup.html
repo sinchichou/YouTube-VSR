@@ -104,6 +104,100 @@
             border-radius: 20px;
         }
 
+        /* --- 上列右側控制群組（開關 + 面板位置按鈕）--- */
+        #top-bar-controls {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
+
+        /* 面板位置按鈕（快顯 ⇄ 側邊欄；選擇性功能，不支援 sidePanel API 時隱藏） */
+        #panel-mode-btn {
+            background: rgba(255, 255, 255, 0.04);
+            color: var(--text-secondary);
+            border: 1px solid var(--border-subtle);
+            border-radius: 16px;
+            padding: 4px 10px;
+            font-size: 12px;
+            font-weight: 500;
+            cursor: pointer;
+            transition: all 0.2s;
+            white-space: nowrap;
+        }
+
+        #panel-mode-btn:hover {
+            background: rgba(163, 113, 247, 0.15);
+            color: var(--text-primary);
+            border-color: var(--accent-color);
+        }
+
+        /* ===================================================================
+           側邊欄模式（popup.html?panel=side 由 Chrome Side Panel 載入）
+           寬度約 250–400px → 三欄改為縱向堆疊，本體可捲動
+           =================================================================== */
+        body.side-panel {
+            width: auto;
+            height: 100vh;
+            font-size: 13px;
+        }
+
+        body.side-panel #top-bar {
+            height: 52px;
+            padding: 0 12px;
+        }
+
+        body.side-panel #top-bar h3 {
+            font-size: 15px;
+        }
+
+        body.side-panel #main-container {
+            flex-direction: column;
+            overflow-y: auto;
+        }
+
+        body.side-panel .panel {
+            width: auto;
+            min-width: 0;
+            border-right: none;
+            border-left: none;
+            border-bottom: 1px solid var(--border-subtle);
+        }
+
+        body.side-panel #shader-library {
+            flex: 0 0 auto;
+            width: auto; /* 覆寫 290px 定寬（ID 權重需同級） */
+            border-right: none;
+            z-index: auto;
+        }
+
+        body.side-panel #library-content {
+            max-height: 220px;
+        }
+
+        body.side-panel #pipeline-container {
+            flex: 0 0 auto;
+            min-width: 0;
+            width: auto;
+            background: var(--bg-panel);
+        }
+
+        body.side-panel #pipeline-list {
+            min-height: 80px;
+            padding: 10px;
+        }
+
+        body.side-panel #properties-panel {
+            flex: 1 1 auto;
+            width: auto; /* 覆寫 230px 定寬 */
+            border-left: none;
+            border-bottom: none;
+            z-index: auto;
+        }
+
+        body.side-panel #properties-content {
+            padding: 12px;
+        }
+
         /* 開關樣式 */
         .switch {
             position: relative;
@@ -448,13 +542,16 @@
 
 <div id="top-bar">
     <h3>YouTube VSR</h3>
-    <div id="toggle-switch-container">
-        <span>OFF</span>
-        <label class="switch">
-            <input id="master-toggle" type="checkbox">
-            <span class="slider"></span>
-        </label>
-        <span style="color: var(--accent-color)">ON</span>
+    <div id="top-bar-controls">
+        <div id="toggle-switch-container">
+            <span>OFF</span>
+            <label class="switch">
+                <input id="master-toggle" type="checkbox">
+                <span class="slider"></span>
+            </label>
+            <span style="color: var(--accent-color)">ON</span>
+        </div>
+        <button id="panel-mode-btn" type="button" title="面板位置">📍 側邊欄</button>
     </div>
 </div>
 

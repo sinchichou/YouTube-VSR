@@ -175,13 +175,15 @@ function diskFetch(url) {
     });
 }
 
-function createChrome({ storage = {}, sent = [] } = {}) {
+function createChrome({ storage = {}, sent = [], withSidePanel = true } = {}) {
     const runtimeListeners = [];
+    const storageChangeListeners = [];
     const chrome = {
         runtime: {
             getURL: (rel) => EXT_ORIGIN + String(rel).replace(/^\//, ''),
             onMessage: { addListener: (fn) => runtimeListeners.push(fn) },
             onInstalled: { addListener: (fn) => { chrome.runtime._installed = fn; } },
+            onStartup: { addListener: (fn) => { chrome.runtime._onStartup = fn; } },
             lastError: null,
         },
         storage: {
@@ -195,6 +197,9 @@ function createChrome({ storage = {}, sent = [] } = {}) {
                 },
                 set: async (obj) => { Object.assign(storage, obj); },
             },
+            onChanged: {
+                addListener: (fn) => storageChangeListeners.push(fn),
+            },
         },
         tabs: {
             query: (_q, cb) => { cb([{ id: 1, url: 'https://www.youtube.com/watch?v=x' }]); },
@@ -203,9 +208,24 @@ function createChrome({ storage = {}, sent = [] } = {}) {
             onUpdated: { addListener: () => {} },
             onActivated: { addListener: () => {} },
         },
-        action: { enable: () => {}, disable: () => {} },
+        action: {
+            enable: () => {},
+            disable: () => {},
+            setPopup: (o) => { chrome._actionPopups.push(o); },
+        },
+        // chrome.sidePanel（panelMode 功能；可關閉以模擬舊環境）
+        ...(withSidePanel ? {
+            sidePanel: {
+                setOptions: async (o) => { chrome._spOptions.push(o); },
+                setPanelBehavior: async (o) => { chrome._spBehavior.push(o); },
+            },
+        } : {}),
     };
     chrome.runtime._listeners = runtimeListeners;
+    chrome.runtime._storageChangeListeners = storageChangeListeners;
+    chrome._actionPopups = [];
+    chrome._spOptions = [];
+    chrome._spBehavior = [];
     return chrome;
 }
 
@@ -341,6 +361,8 @@ section('[B] popup.js —效果庫與管線 DOM 產出');
         fetch: diskFetch,
         setTimeout,
         clearTimeout,
+        URLSearchParams,
+        location: { search: '' },
         __VSR_POPUP_TEST__: true,
     };
     vm.createContext(sandbox);
@@ -580,6 +602,8 @@ section('[D] popup → content 訊息失敗時的行為(重載後接收端不存
         fetch: diskFetch,
         setTimeout,
         clearTimeout,
+        URLSearchParams,
+        location: { search: '' },
         __VSR_POPUP_TEST__: true,
     };
     vm.createContext(sandbox);
@@ -607,6 +631,93 @@ section('[D] popup → content 訊息失敗時的行為(重載後接收端不存
     check('管線已寫入 storage(即使通知失敗)', (storage.pipeline || []).length === 1,
         `${(storage.pipeline || []).length} 項`);
     check('重試次數符合預期(首次 + 注入後 3 次)', sent.length === 4, `${sent.length} 次`);
+}
+
+section('[E] 面板位置（快顯 ⇄ 側邊欄；選擇性功能）');
+{
+    // ---- [E1] manifest:sidePanel 權限 ----
+    const manifest = JSON.parse(fs.readFileSync(path.join(EXT_ROOT, 'manifest.json'), 'utf8'));
+    check('manifest 具有 sidePanel 權限', (manifest.permissions || []).includes('sidePanel'),
+        JSON.stringify(manifest.permissions));
+
+    // ---- [E2] popup.html:按鈕與側邊欄佈局 ----
+    const popupHtml = fs.readFileSync(path.join(EXT_ROOT, 'popup.html'), 'utf8');
+    check('popup.html 有 panel-mode-btn 按鈕', popupHtml.includes('id="panel-mode-btn"'));
+    check('popup.html 有側邊欄縱向佈局 CSS(body.side-panel)',
+        popupHtml.includes('body.side-panel') && popupHtml.includes('flex-direction: column'));
+
+    // ---- [E3] popup.js:功能偵測與接線 ----
+    const popupJs = fs.readFileSync(path.join(EXT_ROOT, 'popup.js'), 'utf8');
+    check('popup.js 有 sidePanel 功能偵測(缺 API 時隱藏按鈕)',
+        popupJs.includes('HAS_SIDEPANEL') && popupJs.includes("panelModeBtn.style.display = 'none'"));
+    check('popup.js 有側邊欄開啟接線(sidePanel.open + panel=side)',
+        popupJs.includes("chrome.sidePanel.open({ windowId: win.id })")
+        && popupJs.includes("popup.html?panel=side"));
+
+    // ---- [E4][E5] background 行為:storage.onChanged(panelMode) → 圖示行為 ----
+    {
+        const bg = loadBackground();
+        const c = bg.chrome;
+        // 模擬 popup 按鈕寫入 panelMode:'side'
+        for (const fn of c.runtime._storageChangeListeners) {
+            fn({ panelMode: { newValue: 'side' } }, 'local');
+        }
+        await new Promise((r) => setTimeout(r, 10));
+        check("panelMode='side' → setOptions(側邊欄路徑, enabled)",
+            c._spOptions.some((o) => o.path === 'popup.html?panel=side' && o.enabled === true),
+            JSON.stringify(c._spOptions));
+        check("panelMode='side' → setPanelBehavior(openPanelOnActionClick:true)",
+            c._spBehavior.some((o) => o.openPanelOnActionClick === true),
+            JSON.stringify(c._spBehavior));
+        check("panelMode='side' → action.setPopup('')(讓圖示點擊開側邊欄)",
+            c._actionPopups.some((o) => o.popup === ''),
+            JSON.stringify(c._actionPopups));
+
+        // 切回 'popup'
+        for (const fn of c.runtime._storageChangeListeners) {
+            fn({ panelMode: { newValue: 'popup' } }, 'local');
+        }
+        await new Promise((r) => setTimeout(r, 10));
+        check("panelMode='popup' → 恢復圖示快顯",
+            c._spBehavior.some((o) => o.openPanelOnActionClick === false)
+            && c._actionPopups.some((o) => o.popup === 'popup.html'),
+            JSON.stringify({ b: c._spBehavior, p: c._actionPopups }));
+    }
+
+    // ---- [E6] 瀏覽器重啟:onStartup 依 storage 恢復行為 ----
+    {
+        const bg = loadBackground();
+        // 預填 storage:panelMode='side'
+        bg.chrome.storage.local.set({ panelMode: 'side' });
+        check('background 有註冊 onStartup', typeof bg.chrome.runtime._onStartup === 'function');
+        bg.chrome.runtime._onStartup();
+        await new Promise((r) => setTimeout(r, 10));
+        check('onStartup 依 storage 恢復側邊欄模式',
+            bg.chrome._spBehavior.some((o) => o.openPanelOnActionClick === true)
+            && bg.chrome._actionPopups.some((o) => o.popup === ''),
+            JSON.stringify({ b: bg.chrome._spBehavior, p: bg.chrome._actionPopups }));
+    }
+
+    // ---- [E7] 無 sidePanel API 的環境(舊瀏覽器):整段跳過、不拋錯 ----
+    {
+        const chromeNoSP = createChrome({ withSidePanel: false });
+        const sandbox = {
+            chrome: chromeNoSP,
+            console: { log: () => {}, warn: () => {}, error: () => {}, info: () => {} },
+            fetch: diskFetch,
+            setTimeout,
+            clearTimeout,
+        };
+        vm.createContext(sandbox);
+        vm.runInContext(fs.readFileSync(path.join(EXT_ROOT, 'background.js'), 'utf8'), sandbox,
+            { filename: 'background.js' });
+        for (const fn of chromeNoSP.runtime._storageChangeListeners) {
+            fn({ panelMode: { newValue: 'side' } }, 'local');
+        }
+        await new Promise((r) => setTimeout(r, 10));
+        check('無 sidePanel API 時 panelMode 變更不拋錯也不動作',
+            chromeNoSP._spOptions.length === 0 && chromeNoSP._spBehavior.length === 0);
+    }
 }
 
 console.log(`\n=== 總結: ${fail === 0 ? 'ALL PASS' : fail + ' FAILED'} (${pass} passed) ===`);

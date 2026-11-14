@@ -436,3 +436,23 @@ VSR 啟用中會在影片右下角顯示淺色徽章(例:`VSR ×2.0`,白 42% + �
 (繞過頁面 CSP;`manifest.json` 因此新增 `host_permissions`),
 經 `CustomEvent('vsr-console-cmd' / 'vsr-console-res')` 與內容腳本通訊。
 在 DevTools context 下拉選單切到本擴充套件時,也可直接使用隔離世界的同名 `VSR` API。
+
+---
+
+## 面板位置:側邊欄(選擇性功能 / 2026-11)
+
+控制面板(效果庫/管線/屬性)可在**快顯視窗**與**瀏覽器側邊欄**之間切換:
+
+- **快顯模式(預設)**:點工具列圖示 → 開啟 800×600 快顯(三欄佈局,行為與舊版相同)。
+- **側邊欄模式**:按面板右上角「📍 側邊欄」→ 面板釘到 Chrome 側邊欄
+  (`popup.html?panel=side`,縱向堆疊佈局,適合 250–400px 窄欄);
+  之後點工具列圖示也會直接開在側邊欄。
+- 切回:側邊欄內按「🪟 快顯模式」→ 圖示點擊恢復開快顯,側邊欄可直接關閉。
+- 設定存於 `chrome.storage.local` 的 `panelMode`('popup' | 'side'),
+  由 background 監聽 `storage.onChanged` 統一套用圖示行為
+  (`action.setPopup` + `sidePanel.setPanelBehavior`),瀏覽器重啟後自動恢復。
+- **選擇性**:不支援 `chrome.sidePanel` 的環境(舊瀏覽器/其他 Chromium 分支)
+  按鈕自動隱藏,一切維持快顯行為;不影響任何既有功能。
+
+驗證:`npm run verify` 的 [E] 節(12 項)涵蓋 manifest 權限、按鈕/佈局、
+panelMode 切換行為、onStartup 恢復與無 API 環境降級。

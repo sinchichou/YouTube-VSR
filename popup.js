@@ -21,6 +21,15 @@ document.addEventListener('DOMContentLoaded', () => {
     const pipelineList = document.getElementById('pipeline-list');
     const propertiesContent = document.getElementById('properties-content');
     const masterToggle = document.getElementById('master-toggle');
+    const panelModeBtn = document.getElementById('panel-mode-btn');
+
+    // --- 面板位置（選擇性功能：Chrome Side Panel）---
+    //   * 以 `popup.html?panel=side` 被側邊欄載入時 → 縱向佈局 + 提供切回快顯
+    //   * 一般快顯中 → 提供「釘到側邊欄」按鈕（寫入 panelMode，background 負責
+    //     把工具列圖示行為切換成開側邊欄）
+    //   * 不支援 chrome.sidePanel 的環境（舊瀏覽器 / 測試 stub）→ 按鈕隱藏
+    const IS_SIDE_PANEL = new URLSearchParams(location.search).get('panel') === 'side';
+    const HAS_SIDEPANEL = typeof chrome !== 'undefined' && !!chrome.sidePanel;
 
     // --- 狀態變數 ---
     let pipeline = []; // 渲染管線中的效果陣列
@@ -37,10 +46,12 @@ document.addEventListener('DOMContentLoaded', () => {
     //================================================================================
 
     async function initialize() {
+        if (IS_SIDE_PANEL) document.body.classList.add('side-panel');
         await loadLibrary();
         buildShaderLibraryUI();
         await restoreSettings();
         setupEventListeners();
+        setupPanelModeButton();
     }
 
     // 從儲存中恢復設定
@@ -51,6 +62,54 @@ document.addEventListener('DOMContentLoaded', () => {
             pipeline = result.pipeline;
         }
         renderPipelineUI();
+    }
+
+    //================================================================================
+    // PANEL MODE（快顯 ⇄ 側邊欄；選擇性功能）
+    //================================================================================
+
+    /** 設定「面板位置」按鈕：不支援 sidePanel API 時隱藏；側邊欄模式中變成切回快顯 */
+    function setupPanelModeButton() {
+        if (!panelModeBtn) return;
+        if (!HAS_SIDEPANEL) {
+            panelModeBtn.style.display = 'none';
+            return;
+        }
+        if (IS_SIDE_PANEL) {
+            panelModeBtn.textContent = '🪟 快顯模式';
+            panelModeBtn.title = '把預設面板位置切回快顯（工具列圖示點擊改開快顯；此側邊欄可直接關閉）';
+        } else {
+            panelModeBtn.textContent = '📍 側邊欄';
+            panelModeBtn.title = '把面板釘到瀏覽器側邊欄（之後點工具列圖示也會開在側邊欄）';
+        }
+        panelModeBtn.addEventListener('click', switchPanelMode);
+    }
+
+    /**
+     * 切換預設面板位置。
+     * 實際的圖示行為（setPopup / setPanelBehavior）由 background 監聽
+     * storage.onChanged 統一套用；這裡只負責需要 user gesture 的部分：
+     * 開啟側邊欄（open() 必須在手勢 context 內呼叫）與收起側邊欄。
+     */
+    async function switchPanelMode() {
+        const next = IS_SIDE_PANEL ? 'popup' : 'side';
+        await chrome.storage.local.set({ panelMode: next });
+        if (next === 'side') {
+            try {
+                await chrome.sidePanel.setOptions({ path: 'popup.html?panel=side', enabled: true });
+                const win = await chrome.windows.getCurrent();
+                await chrome.sidePanel.open({ windowId: win.id });
+                window.close(); // 讓側邊欄接手，收掉快顯
+            } catch (e) {
+                console.error('[VSR] 開啟側邊欄失敗:', e && e.message);
+                panelModeBtn.textContent = '⚠ 側邊欄開啟失敗';
+            }
+        } else {
+            try {
+                await chrome.sidePanel.setOptions({ enabled: false }); // 收起側邊欄
+            } catch (e) { /* 忽略：本來就沒開 */ }
+            panelModeBtn.textContent = '✓ 已切回快顯模式';
+        }
     }
 
     //================================================================================

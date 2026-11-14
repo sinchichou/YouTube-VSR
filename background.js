@@ -352,6 +352,56 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
     }
 });
 
+// ============================================================================
+// 面板位置（快顯 ⇄ 側邊欄；選擇性功能）
+// ---------------------------------------------------------------------------
+// popup 的「面板位置」按鈕只寫 `panelMode` 到 storage；圖示行為由此處統一套用：
+//   'popup'（預設）→ 點工具列圖示開快顯（manifest default_popup）
+//   'side'         → 點工具列圖示開 Chrome 側邊欄（popup.html?panel=side）
+// 切換側邊欄「內容/開關」需要 setOptions；把圖示點擊改成開側邊欄需要
+// setPanelBehavior(openPanelOnActionClick) + 清空 action popup（空字串讓行為接手）。
+// 開啟側邊欄本身（open()）需要 user gesture，由 popup 頁面直接呼叫 —— 不在此處。
+// ============================================================================
+
+/** 側邊欄載入的面板路徑（panel=side 讓 popup.js 套用縱向佈局） */
+const PANEL_SIDEPATH = 'popup.html?panel=side';
+
+/**
+ * 依 panelMode 套用工具列圖示行為。
+ * @param {string} mode 'popup' | 'side'
+ */
+async function applyPanelMode(mode) {
+    if (!chrome.sidePanel) return; // 舊瀏覽器/測試環境：無此 API 即維持快顯
+    try {
+        if (mode === 'side') {
+            await chrome.sidePanel.setOptions({ path: PANEL_SIDEPATH, enabled: true });
+            await chrome.sidePanel.setPanelBehavior({ openPanelOnActionClick: true });
+            await chrome.action.setPopup({ popup: '' });
+        } else {
+            await chrome.sidePanel.setPanelBehavior({ openPanelOnActionClick: false });
+            await chrome.action.setPopup({ popup: 'popup.html' });
+        }
+    } catch (e) {
+        console.warn('[VSR] panelMode 套用失敗:', (e && e.message) || e);
+    }
+}
+
+// panelMode 變更（來自 popup/側邊欄的按鈕）→ 立即套用
+if (chrome.storage.onChanged) {
+    chrome.storage.onChanged.addListener((changes, area) => {
+        if (area === 'local' && Object.prototype.hasOwnProperty.call(changes, 'panelMode')) {
+            applyPanelMode(changes.panelMode.newValue || 'popup');
+        }
+    });
+}
+
+// 瀏覽器重啟後（service worker 冷啟動）恢復圖示行為
+if (chrome.runtime.onStartup) {
+    chrome.runtime.onStartup.addListener(() => {
+        chrome.storage.local.get(['panelMode']).then((r) => applyPanelMode(r.panelMode));
+    });
+}
+
 // 在擴充功能安裝或更新時觸發
 chrome.runtime.onInstalled.addListener(() => {
     console.log("YouTube VSR 擴充功能已安裝/更新。");
