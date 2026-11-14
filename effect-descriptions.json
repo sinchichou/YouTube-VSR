@@ -1,0 +1,519 @@
+{
+  "version": 1,
+  "note": "效果庫雙語說明(en/zh-Hant)。byName 的 key 是『去掉副檔名的基底名稱』小寫;.wgx 與 .wgsl 同名效果共用同一份說明。byPath 針對特定檔案覆寫。未命中時由 background 退回索引自帶的 description(作為 EN)。",
+  "byName": {
+    "adaptivesharpen": {
+      "en": "Edge-aware adaptive sharpening (2015 version) — strengthens detail while avoiding halos on flat areas. Same resolution.",
+      "zh": "邊緣感知的自適應銳化(2015 版)— 強化細節同時避免平坦區域產生光暈。不改變尺寸。"
+    },
+    "anime4k_3d_aa_upscale_us": {
+      "en": "Anime4K CNN upscaler tuned for 3D-rendered anime, with line anti-aliasing (AA). Output 2x.",
+      "zh": "Anime4K 針對 3D 運算動畫調校的 CNN 升頻,附線條抗鋸齒(AA)。輸出 2x。"
+    },
+    "anime4k_3d_upscale_us": {
+      "en": "Anime4K CNN upscaler tuned for 3D-rendered anime (CG-style shading). Output 2x.",
+      "zh": "Anime4K 針對 3D 運算動畫調校的 CNN 升頻(適合 CG 著色)。輸出 2x。"
+    },
+    "anime4k_denoise_bilateral_mean": {
+      "en": "Bilateral denoiser (mean pooling) — smooths noise while keeping edges. Same resolution.",
+      "zh": "雙邊濾波降噪(均值)— 在保住邊緣的同時抹平雜訊。不改變尺寸。"
+    },
+    "anime4k_denoise_bilateral_median": {
+      "en": "Bilateral denoiser (median) — stronger suppression of outlier noise and mosquito artifacts. Same resolution.",
+      "zh": "雙邊濾波降噪(中值)— 對離群雜點與蚊式雜訊抑制更強。不改變尺寸。"
+    },
+    "anime4k_denoise_bilateral_mode": {
+      "en": "Bilateral denoiser (mode) — flattens flat regions, good against heavy compression noise. Same resolution.",
+      "zh": "雙邊濾波降噪(眾數)— 撫平平坦區域,適合對抗重度壓縮雜訊。不改變尺寸。"
+    },
+    "anime4k_restore_s": {
+      "en": "Anime4K CNN line restorer, size S (smallest/fastest) — repairs compression artifacts and blurred lines. Same resolution.",
+      "zh": "Anime4K CNN 線條修復器,規模 S(最小最快)— 修復壓縮失真與糊掉的線條。不改變尺寸。"
+    },
+    "anime4k_restore_m": {
+      "en": "Anime4K CNN line restorer, size M (balanced speed/quality). Same resolution.",
+      "zh": "Anime4K CNN 線條修復器,規模 M(速度與品質平衡)。不改變尺寸。"
+    },
+    "anime4k_restore_l": {
+      "en": "Anime4K CNN line restorer, size L (higher quality, slower). Same resolution.",
+      "zh": "Anime4K CNN 線條修復器,規模 L(品質更高、較慢)。不改變尺寸。"
+    },
+    "anime4k_restore_vl": {
+      "en": "Anime4K CNN line restorer, size VL (very large network). Same resolution.",
+      "zh": "Anime4K CNN 線條修復器,規模 VL(超大網路)。不改變尺寸。"
+    },
+    "anime4k_restore_ul": {
+      "en": "Anime4K CNN line restorer, size UL (largest, best quality, slowest). Same resolution.",
+      "zh": "Anime4K CNN 線條修復器,規模 UL(最大、品質最高、最慢)。不改變尺寸。"
+    },
+    "anime4k_restore_soft_s": {
+      "en": "Anime4K soft line restoration, size S — gentler than Restore, safer on noisy sources. Same resolution.",
+      "zh": "Anime4K 柔和版線條修復,規模 S — 比 Restore 溫和,雜訊來源更不易凸顯瑕疵。不改變尺寸。"
+    },
+    "anime4k_restore_soft_m": {
+      "en": "Anime4K soft line restoration, size M. Same resolution.",
+      "zh": "Anime4K 柔和版線條修復,規模 M。不改變尺寸。"
+    },
+    "anime4k_restore_soft_l": {
+      "en": "Anime4K soft line restoration, size L. Same resolution.",
+      "zh": "Anime4K 柔和版線條修復,規模 L。不改變尺寸。"
+    },
+    "anime4k_restore_soft_vl": {
+      "en": "Anime4K soft line restoration, size VL. Same resolution.",
+      "zh": "Anime4K 柔和版線條修復,規模 VL。不改變尺寸。"
+    },
+    "anime4k_restore_soft_ul": {
+      "en": "Anime4K soft line restoration, size UL. Same resolution.",
+      "zh": "Anime4K 柔和版線條修復,規模 UL。不改變尺寸。"
+    },
+    "anime4k_thin_hq": {
+      "en": "High-quality line thinning — narrows thick outlines for a crisper anime look. Same resolution.",
+      "zh": "高品質細線化 — 收細過粗的輪廓線,讓線條更俐落。不改變尺寸。"
+    },
+    "anime4k_upscale_s": {
+      "en": "Anime4K classic CNN 2x upscaler, size S (fastest).",
+      "zh": "Anime4K 經典 CNN 2x 升頻器,規模 S(最快)。"
+    },
+    "anime4k_upscale_l": {
+      "en": "Anime4K classic CNN 2x upscaler, size L.",
+      "zh": "Anime4K 經典 CNN 2x 升頻器,規模 L。"
+    },
+    "anime4k_upscale_vl": {
+      "en": "Anime4K classic CNN 2x upscaler, size VL.",
+      "zh": "Anime4K 經典 CNN 2x 升頻器,規模 VL。"
+    },
+    "anime4k_upscale_ul": {
+      "en": "Anime4K classic CNN 2x upscaler, size UL (best quality, slowest).",
+      "zh": "Anime4K 經典 CNN 2x 升頻器,規模 UL(品質最高、最慢)。"
+    },
+    "anime4k_upscale_denoise_s": {
+      "en": "Anime4K 2x upscaler with built-in denoising, size S — good for noisy or low-bitrate sources.",
+      "zh": "Anime4K 2x 升頻器,內建降噪,規模 S — 適合雜訊多或低碼率來源。"
+    },
+    "anime4k_upscale_denoise_l": {
+      "en": "Anime4K 2x upscaler with built-in denoising, size L.",
+      "zh": "Anime4K 2x 升頻器,內建降噪,規模 L。"
+    },
+    "anime4k_upscale_denoise_vl": {
+      "en": "Anime4K 2x upscaler with built-in denoising, size VL.",
+      "zh": "Anime4K 2x 升頻器,內建降噪,規模 VL。"
+    },
+    "anime4k_upscale_denoise_ul": {
+      "en": "Anime4K 2x upscaler with built-in denoising, size UL (best quality, slowest).",
+      "zh": "Anime4K 2x 升頻器,內建降噪,規模 UL(品質最高、最慢)。"
+    },
+    "anime4k_upscale_gan_x2_s": {
+      "en": "Anime4K GAN-model 2x upscaler, size S — different training style, sometimes better on soft sources.",
+      "zh": "Anime4K GAN 模型 2x 升頻器,規模 S — 訓練方式不同,對柔軟來源有時更優。"
+    },
+    "anime4k_upscale_gan_x2_m": {
+      "en": "Anime4K GAN-model 2x upscaler, size M.",
+      "zh": "Anime4K GAN 模型 2x 升頻器,規模 M。"
+    },
+    "anime4k_upscale_gan_x3_l": {
+      "en": "Anime4K GAN-model 3x upscaler, size L.",
+      "zh": "Anime4K GAN 模型 3x 升頻器,規模 L。"
+    },
+    "bicubic": {
+      "en": "Bicubic (Catmull-Rom family) resampling — smooth general-purpose scaling, mildly soft.",
+      "zh": "Bicubic(Catmull-Rom 家族)重採樣 — 平滑的通用縮放,略偏柔和。"
+    },
+    "bilinear": {
+      "en": "Bilinear scaling — fastest, slightly blurry; good for mild size changes.",
+      "zh": "雙線性縮放 — 最快、略糊;適合小幅尺寸變化。"
+    },
+    "cas": {
+      "en": "AMD FidelityFX Contrast Adaptive Sharpening — cheap, artifact-resistant sharpening. Same resolution.",
+      "zh": "AMD FidelityFX 對比自適應銳化 — 低成本、不易產生瑕疵。不改變尺寸。"
+    },
+    "cas_scaling": {
+      "en": "FidelityFX CAS with built-in scaling — sharpens and rescales in one pass.",
+      "zh": "FidelityFX CAS 內建縮放版 — 一次完成縮放與銳化。"
+    },
+    "cunny-16x16c-nvl": {
+      "en": "CuNNy lightweight CNN upscaler, topology 16x16C — bigger numbers = more quality, more GPU cost. 2x.",
+      "zh": "CuNNy 輕量 CNN 升頻器,拓撲 16x16C — 數字越大品質越高、GPU 負擔越大。2x。"
+    },
+    "cunny-16x16c-nvl-dn": {
+      "en": "CuNNy 16x16C upscaler with denoising (-DN). 2x.",
+      "zh": "CuNNy 16x16C 升頻器,含降噪(-DN)。2x。"
+    },
+    "cunny-2x4c-nvl": {
+      "en": "CuNNy 2x4C — smallest topology, very fast. 2x.",
+      "zh": "CuNNy 2x4C — 最小拓撲,非常快。2x。"
+    },
+    "cunny-2x4c-nvl-dn": {
+      "en": "CuNNy 2x4C with denoising (-DN). 2x.",
+      "zh": "CuNNy 2x4C,含降噪(-DN)。2x。"
+    },
+    "cunny-3x4c-nvl": {
+      "en": "CuNNy 3x4C upscaler. 2x.",
+      "zh": "CuNNy 3x4C 升頻器。2x。"
+    },
+    "cunny-3x4c-nvl-dn": {
+      "en": "CuNNy 3x4C with denoising (-DN). 2x.",
+      "zh": "CuNNy 3x4C,含降噪(-DN)。2x。"
+    },
+    "cunny-4x16c-nvl": {
+      "en": "CuNNy 4x16C upscaler. 2x.",
+      "zh": "CuNNy 4x16C 升頻器。2x。"
+    },
+    "cunny-4x16c-nvl-dn": {
+      "en": "CuNNy 4x16C with denoising (-DN). 2x.",
+      "zh": "CuNNy 4x16C,含降噪(-DN)。2x。"
+    },
+    "cunny-4x4c-nvl": {
+      "en": "CuNNy 4x4C upscaler — fast tier. 2x.",
+      "zh": "CuNNy 4x4C 升頻器 — 快速檔。2x。"
+    },
+    "cunny-4x4c-nvl-dn": {
+      "en": "CuNNy 4x4C with denoising (-DN). 2x.",
+      "zh": "CuNNy 4x4C,含降噪(-DN)。2x。"
+    },
+    "cunny-4x8c-nvl": {
+      "en": "CuNNy 4x8C upscaler. 2x.",
+      "zh": "CuNNy 4x8C 升頻器。2x。"
+    },
+    "cunny-4x8c-nvl-dn": {
+      "en": "CuNNy 4x8C with denoising (-DN). 2x.",
+      "zh": "CuNNy 4x8C,含降噪(-DN)。2x。"
+    },
+    "cunny-6x8c-nvl": {
+      "en": "CuNNy 6x8C upscaler. 2x.",
+      "zh": "CuNNy 6x8C 升頻器。2x。"
+    },
+    "cunny-6x8c-nvl-dn": {
+      "en": "CuNNy 6x8C with denoising (-DN). 2x.",
+      "zh": "CuNNy 6x8C,含降噪(-DN)。2x。"
+    },
+    "cunny-8x16c-nvl": {
+      "en": "CuNNy 8x16C upscaler — high quality tier. 2x.",
+      "zh": "CuNNy 8x16C 升頻器 — 高品質檔。2x。"
+    },
+    "cunny-8x16c-nvl-dn": {
+      "en": "CuNNy 8x16C with denoising (-DN). 2x.",
+      "zh": "CuNNy 8x16C,含降噪(-DN)。2x。"
+    },
+    "cunny-8x4c-nvl": {
+      "en": "CuNNy 8x4C upscaler. 2x.",
+      "zh": "CuNNy 8x4C 升頻器。2x。"
+    },
+    "cunny-8x4c-nvl-dn": {
+      "en": "CuNNy 8x4C with denoising (-DN). 2x.",
+      "zh": "CuNNy 8x4C,含降噪(-DN)。2x。"
+    },
+    "cunny-8x8c-nvl": {
+      "en": "CuNNy 8x8C upscaler. 2x.",
+      "zh": "CuNNy 8x8C 升頻器。2x。"
+    },
+    "cunny-8x8c-nvl-dn": {
+      "en": "CuNNy 8x8C with denoising (-DN). 2x.",
+      "zh": "CuNNy 8x8C,含降噪(-DN)。2x。"
+    },
+    "cunny-3x12-nvl": {
+      "en": "CuNNy2 upscaler, topology 3x12 — balanced. 2x.",
+      "zh": "CuNNy2 升頻器,拓撲 3x12 — 均衡型。2x。"
+    },
+    "cunny-4x12-nvl": {
+      "en": "CuNNy2 upscaler, topology 4x12. 2x.",
+      "zh": "CuNNy2 升頻器,拓撲 4x12。2x。"
+    },
+    "cunny-4x16-nvl": {
+      "en": "CuNNy2 upscaler, topology 4x16. 2x.",
+      "zh": "CuNNy2 升頻器,拓撲 4x16。2x。"
+    },
+    "cunny-4x24-nvl": {
+      "en": "CuNNy2 upscaler, topology 4x24 — higher quality. 2x.",
+      "zh": "CuNNy2 升頻器,拓撲 4x24 — 品質更高。2x。"
+    },
+    "cunny-4x32-nvl": {
+      "en": "CuNNy2 upscaler, topology 4x32 — high quality, heavier. 2x.",
+      "zh": "CuNNy2 升頻器,拓撲 4x32 — 高品質、負擔較重。2x。"
+    },
+    "cunny-8x32-nvl": {
+      "en": "CuNNy2 8x32 — the heaviest CuNNy2 topology, best quality. 2x.",
+      "zh": "CuNNy2 8x32 — CuNNy2 中最重的拓撲,品質最佳。2x。"
+    },
+    "cunny-fast-nvl": {
+      "en": "CuNNy2 'fast' — speed-first topology (1x12). 2x.",
+      "zh": "CuNNy2『fast』— 速度優先拓撲(1x12)。2x。"
+    },
+    "cunny-faster-nvl": {
+      "en": "CuNNy2 'faster' — even lighter than fast (1x8). 2x.",
+      "zh": "CuNNy2『faster』— 比 fast 更輕量(1x8)。2x。"
+    },
+    "cunny-veryfast-nvl": {
+      "en": "CuNNy2 'veryfast' — lightest topology, for weak GPUs. 2x.",
+      "zh": "CuNNy2『veryfast』— 最輕量拓撲,適合較弱 GPU。2x。"
+    },
+    "deband": {
+      "en": "Removes color banding (visible steps in gradients) by smoothing with fine dithered noise. Same resolution.",
+      "zh": "去除色帶(漸層出現色階斷層)— 以細緻抖動雜訊撫平漸層。不改變尺寸。"
+    },
+    "finesharp": {
+      "en": "FineSharp — luma-based detail sharpening with pseudo-detail suppression; natural result. Same resolution.",
+      "zh": "FineSharp — 基於亮度的細節銳化並抑制偽細節,結果自然。不改變尺寸。"
+    },
+    "fsr_easu": {
+      "en": "AMD FidelityFX SR edge-adaptive upscaling (EASU) — any scale factor, sharp edges.",
+      "zh": "AMD FidelityFX SR 邊緣自適應放大(EASU)— 支援任意倍率,邊緣銳利。"
+    },
+    "fsr_rcas": {
+      "en": "AMD FidelityFX robust contrast-adaptive sharpening (RCAS) — usually paired after EASU. Same resolution.",
+      "zh": "AMD FidelityFX 穩健對比自適應銳化(RCAS)— 通常接在 EASU 之後。不改變尺寸。"
+    },
+    "fsrcnnx": {
+      "en": "FSRCNNX — feature-domain CNN super-resolution on luma; high quality, relatively heavy. 2x.",
+      "zh": "FSRCNNX — 於亮度通道做特徵域 CNN 超解析;品質高、負擔較重。2x。"
+    },
+    "fsrcnnx_lineart": {
+      "en": "FSRCNNX line-art variant — tuned for anime line work. 2x.",
+      "zh": "FSRCNNX 線稿變體 — 針對動畫線條調校。2x。"
+    },
+    "fxaa_high": {
+      "en": "Fast approximate anti-aliasing, preset High (search range 24) — smooths jagged edges. Same resolution.",
+      "zh": "快速近似抗鋸齒,High 預設(搜尋 24 步)— 撫平鋸齒邊緣。不改變尺寸。"
+    },
+    "fxaa_medium": {
+      "en": "Fast approximate anti-aliasing, preset Medium (search range 16). Same resolution.",
+      "zh": "快速近似抗鋸齒,Medium 預設(搜尋 16 步)。不改變尺寸。"
+    },
+    "fxaa_ultra": {
+      "en": "Fast approximate anti-aliasing, preset Ultra (search range 32, best quality). Same resolution.",
+      "zh": "快速近似抗鋸齒,Ultra 預設(搜尋 32 步,品質最佳)。不改變尺寸。"
+    },
+    "imageadjustment": {
+      "en": "Manual image adjustment — HSV saturation/luminance plus contrast/brightness. Same resolution.",
+      "zh": "手動影像調整 — HSV 飽和度/明度與對比/亮度。不改變尺寸。"
+    },
+    "jinc": {
+      "en": "Jinc2 resampling with anti-ringing — high quality for both up- and down-scaling.",
+      "zh": "Jinc2 重採樣 + 抗振鈴 — 高品質,升降採樣皆宜。"
+    },
+    "lanczos": {
+      "en": "Lanczos6 resampling with anti-ringing — sharp classic scaler.",
+      "zh": "Lanczos6 重採樣 + 抗振鈴 — 銳利的經典縮放器。"
+    },
+    "lcas": {
+      "en": "LCAS — light contrast-adaptive sharpening designed for linear-scaled sources. Same resolution.",
+      "zh": "LCAS — 為線性縮放來源設計的輕量對比自適應銳化。不改變尺寸。"
+    },
+    "lumasharpen": {
+      "en": "Luma-domain sharpening with 4 sampling patterns — simple and fast. Same resolution.",
+      "zh": "亮度域銳化,4 種取樣模式 — 簡單快速。不改變尺寸。"
+    },
+    "nearest": {
+      "en": "Nearest-neighbour scaling — hard pixel edges, zero smoothing; for pixel art.",
+      "zh": "最近鄰縮放 — 硬邊緣零平滑;適合像素風。"
+    },
+    "nis": {
+      "en": "NVIDIA Image Scaling — spatial upscaler with built-in adaptive sharpening.",
+      "zh": "NVIDIA Image Scaling — 內建自適應銳化的空間放大器。"
+    },
+    "nvsharpen": {
+      "en": "NVIDIA sharpening pass from the NIS pipeline. Same resolution.",
+      "zh": "NIS 管線中的銳化部分。不改變尺寸。"
+    },
+    "nnedi3_nns16_win8x4": {
+      "en": "NNEDI3 neural doubling (16 neurons, 8x4 window) — lightest NNEDI3 tier. 2x.",
+      "zh": "NNEDI3 神經網路倍線(16 神經元、8x4 視窗)— NNEDI3 最輕量檔。2x。"
+    },
+    "nnedi3_nns16_win8x6": {
+      "en": "NNEDI3 neural doubling (16 neurons, 8x6 window). 2x.",
+      "zh": "NNEDI3 神經網路倍線(16 神經元、8x6 視窗)。2x。"
+    },
+    "nnedi3_nns32_win8x4": {
+      "en": "NNEDI3 neural doubling (32 neurons, 8x4 window). 2x.",
+      "zh": "NNEDI3 神經網路倍線(32 神經元、8x4 視窗)。2x。"
+    },
+    "nnedi3_nns32_win8x6": {
+      "en": "NNEDI3 neural doubling (32 neurons, 8x6 window). 2x.",
+      "zh": "NNEDI3 神經網路倍線(32 神經元、8x6 視窗)。2x。"
+    },
+    "nnedi3_nns64_win8x4": {
+      "en": "NNEDI3 neural doubling (64 neurons, 8x4 window). 2x.",
+      "zh": "NNEDI3 神經網路倍線(64 神經元、8x4 視窗)。2x。"
+    },
+    "nnedi3_nns64_win8x6": {
+      "en": "NNEDI3 neural doubling (64 neurons, 8x6 window). 2x.",
+      "zh": "NNEDI3 神經網路倍線(64 神經元、8x6 視窗)。2x。"
+    },
+    "nnedi3_nns128_win8x4": {
+      "en": "NNEDI3 neural doubling (128 neurons, 8x4 window) — high quality. 2x.",
+      "zh": "NNEDI3 神經網路倍線(128 神經元、8x4 視窗)— 高品質。2x。"
+    },
+    "nnedi3_nns128_win8x6": {
+      "en": "NNEDI3 neural doubling (128 neurons, 8x6 window). 2x.",
+      "zh": "NNEDI3 神經網路倍線(128 神經元、8x6 視窗)。2x。"
+    },
+    "nnedi3_nns256_win8x4": {
+      "en": "NNEDI3 neural doubling (256 neurons, 8x4 window) — best quality, slowest. 2x.",
+      "zh": "NNEDI3 神經網路倍線(256 神經元、8x4 視窗)— 品質最佳、最慢。2x。"
+    },
+    "nnedi3_nns256_win8x6": {
+      "en": "NNEDI3 neural doubling (256 neurons, 8x6 window) — best quality, slowest. 2x.",
+      "zh": "NNEDI3 神經網路倍線(256 神經元、8x6 視窗)— 品質最佳、最慢。2x。"
+    },
+    "opennr_1pass": {
+      "en": "OpenNR noise reduction (single pass) — quickly removes compression noise. Same resolution.",
+      "zh": "OpenNR 降噪(單 pass)— 快速去除壓縮雜訊。不改變尺寸。"
+    },
+    "opennr_spike": {
+      "en": "OpenNR noise reduction (spike variant) — higher quality, heavier. Same resolution.",
+      "zh": "OpenNR 降噪(spike 版)— 品質較高、負擔較重。不改變尺寸。"
+    },
+    "ravu_3x_r2": {
+      "en": "RAVU 3x upscaler (luma, radius 2) — precomputed NN weights, fast for its quality.",
+      "zh": "RAVU 3x 升頻(僅亮度,半徑 2)— 預先計算的 NN 權重,同品質下速度快。"
+    },
+    "ravu_3x_r3": {
+      "en": "RAVU 3x upscaler (luma, radius 3) — smoother than R2, slower.",
+      "zh": "RAVU 3x 升頻(僅亮度,半徑 3)— 比 R2 更平滑、較慢。"
+    },
+    "ravu_3x_r4": {
+      "en": "RAVU 3x upscaler (luma, radius 4) — highest quality RAVU-3x tier.",
+      "zh": "RAVU 3x 升頻(僅亮度,半徑 4)— RAVU-3x 中品質最高。"
+    },
+    "ravu_3x_r2_rgb": {
+      "en": "RAVU 3x (radius 2) processed directly on RGB — better for colored fine details.",
+      "zh": "RAVU 3x(半徑 2)直接對 RGB 全通道處理 — 彩色細節表現較好。"
+    },
+    "ravu_3x_r3_rgb": {
+      "en": "RAVU 3x (radius 3) processed directly on RGB.",
+      "zh": "RAVU 3x(半徑 3)直接對 RGB 全通道處理。"
+    },
+    "ravu_3x_r4_rgb": {
+      "en": "RAVU 3x (radius 4) processed directly on RGB — best quality RAVU-3x.",
+      "zh": "RAVU 3x(半徑 4)直接對 RGB 全通道處理 — RAVU-3x 品質最高。"
+    },
+    "ravu_r2": {
+      "en": "RAVU 2x upscaler (luma, radius 2).",
+      "zh": "RAVU 2x 升頻(僅亮度,半徑 2)。"
+    },
+    "ravu_r3": {
+      "en": "RAVU 2x upscaler (luma, radius 3).",
+      "zh": "RAVU 2x 升頻(僅亮度,半徑 3)。"
+    },
+    "ravu_r4": {
+      "en": "RAVU 2x upscaler (luma, radius 4).",
+      "zh": "RAVU 2x 升頻(僅亮度,半徑 4)。"
+    },
+    "ravu_r2_rgb": {
+      "en": "RAVU 2x (radius 2) processed directly on RGB.",
+      "zh": "RAVU 2x(半徑 2)直接對 RGB 全通道處理。"
+    },
+    "ravu_r3_rgb": {
+      "en": "RAVU 2x (radius 3) processed directly on RGB.",
+      "zh": "RAVU 2x(半徑 3)直接對 RGB 全通道處理。"
+    },
+    "ravu_r4_rgb": {
+      "en": "RAVU 2x (radius 4) processed directly on RGB.",
+      "zh": "RAVU 2x(半徑 4)直接對 RGB 全通道處理。"
+    },
+    "ravu_lite_r2": {
+      "en": "RAVU-Lite 2x (radius 2) — reduced compute version.",
+      "zh": "RAVU-Lite 2x(半徑 2)— 計算量精簡版。"
+    },
+    "ravu_lite_r3": {
+      "en": "RAVU-Lite 2x (radius 3).",
+      "zh": "RAVU-Lite 2x(半徑 3)。"
+    },
+    "ravu_lite_r4": {
+      "en": "RAVU-Lite 2x (radius 4).",
+      "zh": "RAVU-Lite 2x(半徑 4)。"
+    },
+    "ravu_lite_ar_r2": {
+      "en": "RAVU-Lite 2x with anti-ringing (radius 2) — fewer halos near sharp edges.",
+      "zh": "RAVU-Lite 2x 抗振鈴版(半徑 2)— 銳利邊緣附近不易出光暈。"
+    },
+    "ravu_lite_ar_r3": {
+      "en": "RAVU-Lite 2x with anti-ringing (radius 3).",
+      "zh": "RAVU-Lite 2x 抗振鈴版(半徑 3)。"
+    },
+    "ravu_lite_ar_r4": {
+      "en": "RAVU-Lite 2x with anti-ringing (radius 4).",
+      "zh": "RAVU-Lite 2x 抗振鈴版(半徑 4)。"
+    },
+    "ravu_zoom_r2": {
+      "en": "RAVU-Zoom — arbitrary-scale version (radius 2); good for non-integer sizes.",
+      "zh": "RAVU-Zoom — 任意倍率版(半徑 2);適合非整數尺寸。"
+    },
+    "ravu_zoom_r3": {
+      "en": "RAVU-Zoom — arbitrary-scale version (radius 3).",
+      "zh": "RAVU-Zoom — 任意倍率版(半徑 3)。"
+    },
+    "ravu_zoom_r2_rgb": {
+      "en": "RAVU-Zoom (radius 2) processed directly on RGB.",
+      "zh": "RAVU-Zoom(半徑 2)直接對 RGB 全通道處理。"
+    },
+    "ravu_zoom_r3_rgb": {
+      "en": "RAVU-Zoom (radius 3) processed directly on RGB.",
+      "zh": "RAVU-Zoom(半徑 3)直接對 RGB 全通道處理。"
+    },
+    "ravu_zoom_ar_r2": {
+      "en": "RAVU-Zoom with anti-ringing (radius 2).",
+      "zh": "RAVU-Zoom 抗振鈴版(半徑 2)。"
+    },
+    "ravu_zoom_ar_r3": {
+      "en": "RAVU-Zoom with anti-ringing (radius 3).",
+      "zh": "RAVU-Zoom 抗振鈴版(半徑 3)。"
+    },
+    "ravu_zoom_ar_r2_rgb": {
+      "en": "RAVU-Zoom anti-ringing (radius 2) processed directly on RGB.",
+      "zh": "RAVU-Zoom 抗振鈴版(半徑 2)直接對 RGB 全通道處理。"
+    },
+    "ravu_zoom_ar_r3_rgb": {
+      "en": "RAVU-Zoom anti-ringing (radius 3) processed directly on RGB.",
+      "zh": "RAVU-Zoom 抗振鈴版(半徑 3)直接對 RGB 全通道處理。"
+    },
+    "sharpen": {
+      "en": "Generic sharpening (legacy .wgsl). Same resolution.",
+      "zh": "通用銳化(legacy .wgsl)。不改變尺寸。"
+    },
+    "smaa_low": {
+      "en": "Subpixel morphological anti-aliasing, Low quality — cheapest SMAA tier. Same resolution.",
+      "zh": "次像素形態學抗鋸齒,Low 品質 — SMAA 最輕量檔。不改變尺寸。"
+    },
+    "smaa_medium": {
+      "en": "Subpixel morphological anti-aliasing, Medium quality. Same resolution.",
+      "zh": "次像素形態學抗鋸齒,Medium 品質。不改變尺寸。"
+    },
+    "smaa_high": {
+      "en": "Subpixel morphological anti-aliasing, High quality. Same resolution.",
+      "zh": "次像素形態學抗鋸齒,High 品質。不改變尺寸。"
+    },
+    "smaa_ultra": {
+      "en": "Subpixel morphological anti-aliasing, Ultra quality — best edge reconstruction. Same resolution.",
+      "zh": "次像素形態學抗鋸齒,Ultra 品質 — 邊緣重建最佳。不改變尺寸。"
+    },
+    "ssimdownscaler": {
+      "en": "SSIM-guided perceptual downscaler — keeps perceived detail when shrinking large sources.",
+      "zh": "以 SSIM 引導的感知降採樣 — 縮小高解析來源時保留視覺細節。"
+    },
+    "xbrz_2x": {
+      "en": "xBRZ pixel-art upscaler 2x — crisp outlines and clean color edges for sprites.",
+      "zh": "xBRZ 像素風放大 2x — 為點陣圖保留俐落輪廓與乾淨色塊邊緣。"
+    },
+    "xbrz_3x": {
+      "en": "xBRZ pixel-art upscaler 3x.",
+      "zh": "xBRZ 像素風放大 3x。"
+    },
+    "xbrz_4x": {
+      "en": "xBRZ pixel-art upscaler 4x.",
+      "zh": "xBRZ 像素風放大 4x。"
+    },
+    "xbrz_5x": {
+      "en": "xBRZ pixel-art upscaler 5x.",
+      "zh": "xBRZ 像素風放大 5x。"
+    },
+    "xbrz_6x": {
+      "en": "xBRZ pixel-art upscaler 6x.",
+      "zh": "xBRZ 像素風放大 6x。"
+    },
+    "xbrz_freescale": {
+      "en": "xBRZ free-scale — arbitrary factor pixel-art scaling.",
+      "zh": "xBRZ 任意倍率版 — 非固定倍率的像素風縮放。"
+    }
+  },
+  "byPath": {}
+}
