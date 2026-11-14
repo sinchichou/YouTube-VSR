@@ -76,10 +76,10 @@ document.addEventListener('DOMContentLoaded', () => {
             return;
         }
         if (IS_SIDE_PANEL) {
-            panelModeBtn.textContent = '🪟 快顯模式';
+            panelModeBtn.textContent = '快顯模式';
             panelModeBtn.title = '把預設面板位置切回快顯（工具列圖示點擊改開快顯；此側邊欄可直接關閉）';
         } else {
-            panelModeBtn.textContent = '📍 側邊欄';
+            panelModeBtn.textContent = '側邊欄';
             panelModeBtn.title = '把面板釘到瀏覽器側邊欄（之後點工具列圖示也會開在側邊欄）';
         }
         panelModeBtn.addEventListener('click', switchPanelMode);

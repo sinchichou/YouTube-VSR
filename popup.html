@@ -1,595 +1,908 @@
-<!DOCTYPE html>
+<!doctype html>
 <html lang="zh-Hant">
-<head>
-    <meta charset="UTF-8">
+  <head>
+    <meta charset="UTF-8" />
     <title>YouTube VSR 控制面板</title>
     <style>
-        :root {
-            /* --- 色彩系統 --- */
-            --bg-base: #161b22;
-            --bg-panel: #0d1117;
-            --bg-card: #21262d;
-            --bg-hover: #30363d;
-            --border-subtle: rgba(240, 246, 252, 0.1);
-            --text-primary: #e6edf3;
-            --text-secondary: #8b949e;
-            --accent-color: #a371f7;
-            --accent-glow: rgba(163, 113, 247, 0.25);
-            --danger-color: #f85149;
-            --radius-s: 6px;
-            --radius-m: 12px;
-        }
-
-        * {
-            box-sizing: border-box;
-            user-select: none;
-        }
-
-        body {
-            margin: 0;
-            background-color: var(--bg-base);
-            color: var(--text-primary);
-            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
-            display: flex;
-            flex-direction: column;
-            width: 800px;
-            height: 600px;
-            overflow: hidden;
-            font-size: 14px;
-            line-height: 1.5;
-        }
-
-        /* 滾動條樣式 */
-        ::-webkit-scrollbar {
-            width: 5px;
-            height: 5px;
-        }
-
-        ::-webkit-scrollbar-track {
-            background: transparent;
-        }
-
-        ::-webkit-scrollbar-thumb {
-            background: #484f58;
-            border-radius: 10px;
-        }
-
-        ::-webkit-scrollbar-thumb:hover {
-            background: #6e7681;
-        }
-
-        /* --- 上方導航列 --- */
-        #top-bar {
-            height: 60px;
-            padding: 0 24px;
-            background: rgba(13, 17, 23, 0.95);
-            border-bottom: 1px solid var(--border-subtle);
-            backdrop-filter: blur(10px);
-            display: flex;
-            align-items: center;
-            justify-content: space-between;
-            flex-shrink: 0; /* 防止被擠壓 */
-        }
-
-        #top-bar h3 {
-            margin: 0;
-            font-size: 18px;
-            font-weight: 600;
-            letter-spacing: 0.5px;
-            color: #fff;
-            display: flex;
-            align-items: center;
-            gap: 10px;
-        }
-
-        #top-bar h3::before {
-            content: '';
-            display: block;
-            width: 8px;
-            height: 8px;
-            background: var(--accent-color);
-            border-radius: 50%;
-            box-shadow: 0 0 8px var(--accent-color);
-        }
-
-        #toggle-switch-container {
-            display: flex;
-            align-items: center;
-            gap: 12px;
-            font-size: 13px;
-            font-weight: 500;
-            color: var(--text-secondary);
-            background: rgba(255, 255, 255, 0.03);
-            padding: 4px 12px;
-            border-radius: 20px;
-        }
-
-        /* --- 上列右側控制群組（開關 + 面板位置按鈕）--- */
-        #top-bar-controls {
-            display: flex;
-            align-items: center;
-            gap: 10px;
-        }
-
-        /* 面板位置按鈕（快顯 ⇄ 側邊欄；選擇性功能，不支援 sidePanel API 時隱藏） */
-        #panel-mode-btn {
-            background: rgba(255, 255, 255, 0.04);
-            color: var(--text-secondary);
-            border: 1px solid var(--border-subtle);
-            border-radius: 16px;
-            padding: 4px 10px;
-            font-size: 12px;
-            font-weight: 500;
-            cursor: pointer;
-            transition: all 0.2s;
-            white-space: nowrap;
-        }
-
-        #panel-mode-btn:hover {
-            background: rgba(163, 113, 247, 0.15);
-            color: var(--text-primary);
-            border-color: var(--accent-color);
-        }
-
-        /* ===================================================================
-           側邊欄模式（popup.html?panel=side 由 Chrome Side Panel 載入）
-           寬度約 250–400px → 三欄改為縱向堆疊，本體可捲動
-           =================================================================== */
-        body.side-panel {
-            width: auto;
-            height: 100vh;
-            font-size: 13px;
-        }
-
-        body.side-panel #top-bar {
-            height: 52px;
-            padding: 0 12px;
-        }
-
-        body.side-panel #top-bar h3 {
-            font-size: 15px;
-        }
-
-        body.side-panel #main-container {
-            flex-direction: column;
-            overflow-y: auto;
-        }
-
-        body.side-panel .panel {
-            width: auto;
-            min-width: 0;
-            border-right: none;
-            border-left: none;
-            border-bottom: 1px solid var(--border-subtle);
-        }
-
-        body.side-panel #shader-library {
-            flex: 0 0 auto;
-            width: auto; /* 覆寫 290px 定寬（ID 權重需同級） */
-            border-right: none;
-            z-index: auto;
-        }
-
-        body.side-panel #library-content {
-            max-height: 220px;
-        }
-
-        body.side-panel #pipeline-container {
-            flex: 0 0 auto;
-            min-width: 0;
-            width: auto;
-            background: var(--bg-panel);
-        }
-
-        body.side-panel #pipeline-list {
-            min-height: 80px;
-            padding: 10px;
-        }
-
-        body.side-panel #properties-panel {
-            flex: 1 1 auto;
-            width: auto; /* 覆寫 230px 定寬 */
-            border-left: none;
-            border-bottom: none;
-            z-index: auto;
-        }
-
-        body.side-panel #properties-content {
-            padding: 12px;
-        }
-
-        /* 開關樣式 */
-        .switch {
-            position: relative;
-            display: inline-block;
-            width: 44px;
-            height: 24px;
-        }
-        .switch input { opacity: 0; width: 0; height: 0; }
-
-        .slider {
-            position: absolute;
-            cursor: pointer;
-            top: 0;
-            left: 0;
-            right: 0;
-            bottom: 0;
-            background-color: #30363d;
-            transition: .3s;
-            border-radius: 24px;
-            border: 1px solid #484f58;
-        }
-
-        .slider:before {
-            position: absolute;
-            content: "";
-            height: 18px;
-            width: 18px;
-            left: 2px;
-            bottom: 2px;
-            background-color: #c9d1d9;
-            transition: .3s;
-            border-radius: 50%;
-        }
-
-        input:checked + .slider {
-            background-color: var(--accent-color);
-            border-color: var(--accent-color);
-            box-shadow: 0 0 10px var(--accent-glow);
-        }
-
-        input:checked + .slider:before {
-            transform: translateX(20px);
-            background-color: #fff;
-        }
-
-        /* --- 主佈局調整 (關鍵修改處) --- */
-        #main-container {
-            display: flex;
-            flex-grow: 1;
-            overflow: hidden;
-            background: var(--bg-base);
-        }
-
-        .panel {
-            display: flex;
-            flex-direction: column;
-            background: var(--bg-panel);
-            position: relative;
-        }
-
-        .panel h3 {
-            padding: 14px 16px;
-            margin: 0;
-            font-size: 12px;
-            text-transform: uppercase;
-            letter-spacing: 1px;
-            color: var(--text-secondary);
-            background: var(--bg-panel);
-            border-bottom: 1px solid var(--border-subtle);
-            flex-shrink: 0;
-        }
-
-        /* --- 欄位寬度設定 --- */
-
-        /* 1. 左側庫：加寬到 290px */
-        #shader-library {
-            width: 290px;
-            border-right: 1px solid var(--border-subtle);
-            z-index: 2;
-        }
-
-        /* 2. 中間管線：自適應剩餘空間 (約 280px) */
-        #pipeline-container {
-            flex-grow: 1;
-            background: var(--bg-base);
-            min-width: 200px;
-        }
-
-        /* 3. 右側屬性：稍微縮窄到 230px (夠放滑桿即可) */
-        #properties-panel {
-            width: 230px;
-            border-left: 1px solid var(--border-subtle);
-            z-index: 2;
-        }
-
-        /* 內容區塊 */
-        #library-content, #pipeline-list, #properties-content {
-            padding: 10px;
-            overflow-y: auto;
-            flex-grow: 1;
-        }
-
-        /* --- 列表項目優化 (防止文字擠壓) --- */
-        .shader-category > h4 {
-            margin: 0 0 4px 0;
-            padding: 8px 10px;
-            cursor: pointer;
-            border-radius: var(--radius-s);
-            color: var(--text-primary);
-            font-size: 13px;
-            font-weight: 600;
-            display: flex;
-            align-items: center;
-        }
-
-        .shader-category > h4:hover {
-            background: var(--bg-hover);
-        }
-
-        .shader-category > h4::before {
-            content: '▸';
-            display: inline-block;
-            width: 18px;
-            color: var(--text-secondary);
-        }
-
-        .shader-list li {
-            padding: 8px 10px 8px 28px; /* 調整內距 */
-            margin-bottom: 2px;
-            cursor: pointer;
-            border-radius: var(--radius-s);
-            font-size: 13px;
-            color: var(--text-secondary);
-            display: flex;
-            justify-content: space-between;
-            align-items: center;
-            transition: all 0.2s;
-            white-space: nowrap; /* 不換行 */
-        }
-
-        .shader-list li:hover {
-            background: var(--bg-hover);
-            color: #fff;
-        }
-
-        /* 處理長檔名 */
-        .shader-name {
-            overflow: hidden;
-            text-overflow: ellipsis;
-            margin-right: 8px; /* 與按鈕保持距離 */
-        }
-
-        .add-btn {
-            opacity: 0;
-            background: var(--accent-color);
-            color: white;
-            border: none;
-            width: 22px;
-            height: 22px;
-            border-radius: 4px;
-            cursor: pointer;
-            font-size: 16px;
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            transition: opacity 0.2s;
-            flex-shrink: 0;
-        }
-
-        .shader-list li:hover .add-btn {
-            opacity: 1;
-        }
-
-        /* --- 管線項目 --- */
-        #pipeline-list {
-            padding: 16px;
-            margin: 0;
-            display: flex;
-            flex-direction: column;
-            gap: 8px;
-        }
-
-        .pipeline-item {
-            background: var(--bg-card);
-            border: 1px solid var(--border-subtle);
-            padding: 12px 14px;
-            border-radius: var(--radius-s);
-            cursor: grab;
-            display: flex;
-            justify-content: space-between;
-            align-items: center;
-            box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
-            transition: transform 0.2s, border-color 0.2s;
-        }
-
-        .pipeline-item:hover {
-            transform: translateY(-2px);
-            border-color: #8b949e;
-        }
-
-        .pipeline-item.selected {
-            border-color: var(--accent-color);
-            background: rgba(163, 113, 247, 0.08);
-        }
-
-        .remove-btn {
-            background: transparent;
-            color: var(--text-secondary);
-            border: none;
-            width: 24px;
-            height: 24px;
-            border-radius: 4px;
-            cursor: pointer;
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            font-size: 18px;
-        }
-
-        .remove-btn:hover {
-            background: rgba(248, 81, 73, 0.15);
-            color: var(--danger-color);
-        }
-
-        /* --- 屬性控制 --- */
-        #properties-content {
-            padding: 16px;
-        }
-
-        .control-group {
-            margin-bottom: 20px;
-        }
-
-        .control-group label {
-            display: flex;
-            justify-content: space-between;
-            margin-bottom: 10px;
-            font-size: 12px;
-            color: var(--text-secondary);
-            font-weight: 500;
-        }
-
-        .control-group span {
-            font-family: monospace;
-            color: var(--accent-color);
-            background: rgba(163, 113, 247, 0.1);
-            padding: 2px 6px;
-            border-radius: 4px;
-        }
-
-        input[type="range"] {
-            -webkit-appearance: none;
-            width: 100%;
-            height: 4px;
-            background: #30363d;
-            border-radius: 2px;
-            outline: none;
-            margin: 0;
-        }
-
-        input[type="range"]::-webkit-slider-thumb {
-            -webkit-appearance: none;
-            width: 16px;
-            height: 16px;
-            border-radius: 50%;
-            background: #c9d1d9;
-            border: 2px solid var(--bg-panel);
-            cursor: pointer;
-            transition: transform 0.1s;
-        }
-
-        input[type="range"]::-webkit-slider-thumb:hover {
-            background: var(--accent-color);
-            transform: scale(1.2);
-        }
-
-        /* 空狀態 */
-        #placeholder-text {
-            text-align: center;
-            margin-top: 50px;
-            color: var(--text-secondary);
-            font-style: italic;
-            opacity: 0.6;
-            display: flex;
-            flex-direction: column;
-            align-items: center;
-            gap: 8px;
-        }
-
-        /* ===== 效果說明 tooltip(滑鼠移入 / 鍵盤 focus)===== */
-        #vsr-tooltip {
-            position: fixed;
-            z-index: 999;
-            max-width: 340px;
-            padding: 10px 12px;
-            background: var(--bg-panel, #0d1117);
-            border: 1px solid var(--border-subtle, rgba(240, 246, 252, 0.1));
-            border-radius: var(--radius-m, 12px);
-            box-shadow: 0 8px 24px rgba(0, 0, 0, 0.5);
-            font-size: 12px;
-            line-height: 1.55;
-            color: var(--text-primary, #e6edf3);
-            pointer-events: none; /* 不擋住滑鼠,移入後立即離開也不黏住 */
-        }
-
-        #vsr-tooltip .vsr-tip-name {
-            font-weight: 600;
-            font-size: 13px;
-            color: #fff;
-            margin-bottom: 2px;
-        }
-
-        #vsr-tooltip .vsr-tip-meta {
-            color: var(--accent-color, #a371f7);
-            font-size: 11px;
-            margin-bottom: 6px;
-        }
-
-        #vsr-tooltip .vsr-tip-zh {
-            color: var(--text-primary, #e6edf3);
-            margin-bottom: 4px;
-        }
-
-        #vsr-tooltip .vsr-tip-en {
-            color: var(--text-secondary, #8b949e);
-            margin-bottom: 4px;
-        }
-
-        #vsr-tooltip .vsr-tip-path {
-            color: var(--text-secondary, #8b949e);
-            font-family: ui-monospace, Consolas, monospace;
-            font-size: 10px;
-            opacity: 0.75;
-            word-break: break-all;
-            border-top: 1px solid var(--border-subtle, rgba(240, 246, 252, 0.1));
-            padding-top: 4px;
-            margin-top: 2px;
-        }
+      /* ===== 修正窄版清單兩行資訊不擠壓 + 按鈕 ===== */
+      .shader-list li > :first-child {
+        min-width: 0;
+        flex: 1;
+      }
+
+      /* ===== 面板核心容器適配（防止 Properties 被擠出底部）===== */
+      #main-container {
+        min-height: 0;
+      }
+
+      #main-container > .panel {
+        border: none !important;
+        min-width: 0;
+        min-height: 0;
+        overflow: hidden;
+      }
+
+      body:not(.side-panel) #main-container > .panel:not(.collapsed) {
+        min-width: 145px;
+      }
+
+      body.side-panel #main-container {
+        height: 0;
+        flex: 1 1 auto;
+        overflow-y: auto;
+      }
+
+      body.side-panel .panel:not(.collapsed) {
+        min-height: 84px;
+      }
+
+      body.side-panel #library-content {
+        max-height: none !important; /* 移除原本 220px 上限，改由拖動控制 */
+      }
+
+      body.side-panel #pipeline-list {
+        min-height: 0 !important;
+      }
+
+      /* ===== 面板標題列（拖動把手 + 收合按鈕）===== */
+      .panel > h3.panel-header {
+        display: flex;
+        align-items: center;
+        gap: 8px;
+        cursor: pointer;
+        user-select: none;
+        transition: background 0.15s;
+      }
+
+      .panel > h3.panel-header:hover {
+        background: rgba(255, 255, 255, 0.05);
+      }
+
+      .panel-drag-handle {
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        color: var(--text-secondary, #999);
+        opacity: 0.45;
+        font-size: 13px;
+        letter-spacing: -1px;
+        line-height: 1;
+        padding: 2px 3px;
+        border-radius: 4px;
+        cursor: grab;
+        flex-shrink: 0;
+        transition:
+          opacity 0.15s,
+          color 0.15s,
+          background 0.15s;
+      }
+
+      .panel > h3.panel-header:hover .panel-drag-handle {
+        opacity: 0.9;
+      }
+
+      .panel-drag-handle:hover {
+        color: var(--text-primary, #fff);
+        background: rgba(255, 255, 255, 0.08);
+      }
+
+      .panel-title {
+        flex: 1;
+        min-width: 0;
+        overflow: hidden;
+        text-overflow: ellipsis;
+        white-space: nowrap;
+      }
+
+      .panel-collapse-btn {
+        margin-inline-start: auto;
+        flex-shrink: 0;
+        width: 22px;
+        height: 22px;
+        padding: 0;
+        border: none;
+        border-radius: 6px;
+        background: transparent;
+        color: var(--text-secondary, #aaa);
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        cursor: pointer;
+        transition:
+          background 0.15s,
+          color 0.15s,
+          transform 0.2s;
+      }
+
+      .panel-collapse-btn:hover {
+        background: rgba(255, 255, 255, 0.1);
+        color: var(--text-primary, #fff);
+      }
+
+      .panel-collapse-btn svg {
+        width: 14px;
+        height: 14px;
+        transition: transform 0.2s ease;
+      }
+
+      .panel.collapsed .panel-collapse-btn svg {
+        transform: rotate(-90deg);
+      }
+
+      /* ===== 收合狀態樣式 ===== */
+      .panel.collapsed > :not(h3) {
+        display: none !important;
+      }
+
+      body.side-panel .panel.collapsed {
+        flex: 0 0 auto !important;
+        min-height: 0 !important;
+        height: auto !important;
+      }
+
+      body.side-panel .panel.collapsed > h3.panel-header {
+        border-bottom: none;
+      }
+
+      /* 快顯模式（800×600）收合後變成直立側欄 */
+      body:not(.side-panel) .panel.collapsed {
+        flex: 0 0 38px !important;
+        width: 38px !important;
+        min-width: 38px !important;
+      }
+
+      body:not(.side-panel) .panel.collapsed > h3.panel-header {
+        writing-mode: vertical-rl;
+        flex-grow: 1;
+        padding: 12px 7px;
+        border-bottom: none;
+        justify-content: flex-start;
+        gap: 10px;
+      }
+
+      body:not(.side-panel) .panel.collapsed .panel-drag-handle {
+        padding: 3px 2px;
+      }
+
+      /* ===== 面板間拖動分隔條 ===== */
+      .panel-resizer {
+        position: relative;
+        flex: 0 0 6px;
+        background: var(--bg-panel, #161616);
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        z-index: 5;
+        transition: background 0.15s;
+      }
+
+      .panel-resizer::before {
+        content: "";
+        position: absolute;
+        inset: 0;
+        pointer-events: none;
+      }
+
+      .panel-resizer::after {
+        content: "";
+        border-radius: 99px;
+        background: rgba(255, 255, 255, 0.18);
+        transition:
+          background 0.15s,
+          transform 0.15s;
+      }
+
+      /* 側邊欄：水平分隔條（上下拖動） */
+      body.side-panel .panel-resizer {
+        cursor: row-resize;
+        border-top: 1px solid var(--border-subtle, rgba(255, 255, 255, 0.1));
+        border-bottom: 1px solid var(--border-subtle, rgba(255, 255, 255, 0.1));
+      }
+      body.side-panel .panel-resizer::after {
+        width: 34px;
+        height: 3px;
+      }
+
+      /* 快顯視窗：垂直分隔條（左右拖動） */
+      body:not(.side-panel) .panel-resizer {
+        cursor: col-resize;
+        border-left: 1px solid var(--border-subtle, rgba(255, 255, 255, 0.1));
+        border-right: 1px solid var(--border-subtle, rgba(255, 255, 255, 0.1));
+      }
+      body:not(.side-panel) .panel-resizer::after {
+        width: 3px;
+        height: 34px;
+      }
+
+      .panel-resizer:hover::after,
+      .panel-resizer.active::after {
+        background: var(--accent-color, #ff0033);
+      }
+      body.side-panel .panel-resizer:hover::after,
+      body.side-panel .panel-resizer.active::after {
+        transform: scaleX(1.35);
+      }
+      body:not(.side-panel) .panel-resizer:hover::after,
+      body:not(.side-panel) .panel-resizer.active::after {
+        transform: scaleY(1.35);
+      }
+
+      /* 面板收合時，分隔條退化為 1px 細線 */
+      .panel-resizer.disabled {
+        flex: 0 0 1px !important;
+        border: none !important;
+        background: var(--border-subtle, rgba(255, 255, 255, 0.1));
+        cursor: default !important;
+        pointer-events: none;
+      }
+      .panel-resizer.disabled::after {
+        display: none;
+      }
+
+      /* ===== 拖曳交換面板順序時的視覺回饋 ===== */
+      body.panel-reordering,
+      body.panel-reordering * {
+        cursor: grabbing !important;
+        user-select: none !important;
+      }
+
+      .panel.is-dragging {
+        opacity: 0.45;
+      }
+
+      body.side-panel .panel.drop-before {
+        box-shadow: inset 0 3px 0 var(--accent-color, #ff0033);
+      }
+      body.side-panel .panel.drop-after {
+        box-shadow: inset 0 -3px 0 var(--accent-color, #ff0033);
+      }
+      body:not(.side-panel) .panel.drop-before {
+        box-shadow: inset 3px 0 0 var(--accent-color, #ff0033);
+      }
+      body:not(.side-panel) .panel.drop-after {
+        box-shadow: inset -3px 0 0 var(--accent-color, #ff0033);
+      }
+
+      .panel-drag-ghost {
+        position: fixed;
+        z-index: 9999;
+        pointer-events: none;
+        padding: 6px 12px;
+        border-radius: 8px;
+        background: var(--bg-card, #212121);
+        border: 1px solid var(--accent-color, #ff0033);
+        color: var(--text-primary, #fff);
+        font-size: 12px;
+        font-weight: 600;
+        letter-spacing: 0.6px;
+        text-transform: uppercase;
+        box-shadow: 0 10px 24px rgba(0, 0, 0, 0.5);
+        display: flex;
+        align-items: center;
+        gap: 8px;
+        transform: translate(10px, 10px);
+      }
+      :root {
+        --bg-base: #0f0f0f;
+        --bg-panel: #161616;
+        --bg-card: #212121;
+        --bg-hover: #2d2d2d;
+        --border-subtle: rgba(255, 255, 255, 0.1);
+        --text-primary: #f1f1f1;
+        --text-secondary: #aaaaaa;
+        --accent-color: #ff0033;
+        --accent-soft: rgba(255, 0, 51, 0.14);
+        --danger-color: #ff4e45;
+        --radius-s: 10px;
+        --radius-m: 14px;
+      }
+
+      * {
+        box-sizing: border-box;
+        user-select: none;
+      }
+
+      body {
+        margin: 0;
+        background: var(--bg-base);
+        color: var(--text-primary);
+        font-family:
+          "Roboto",
+          -apple-system,
+          BlinkMacSystemFont,
+          "Segoe UI",
+          Arial,
+          sans-serif;
+        display: flex;
+        flex-direction: column;
+        width: 800px;
+        height: 600px;
+        overflow: hidden;
+        font-size: 13.5px;
+        line-height: 1.5;
+      }
+
+      ::-webkit-scrollbar {
+        width: 6px;
+        height: 6px;
+      }
+      ::-webkit-scrollbar-track {
+        background: transparent;
+      }
+      ::-webkit-scrollbar-thumb {
+        background: #3f3f3f;
+        border-radius: 99px;
+      }
+      ::-webkit-scrollbar-thumb:hover {
+        background: #606060;
+      }
+
+      /* --- Top Bar --- */
+      #top-bar {
+        height: 58px;
+        padding: 0 22px;
+        background: #0f0f0f;
+        border-bottom: 1px solid var(--border-subtle);
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        flex-shrink: 0;
+        transition: background 0.3s;
+      }
+      #top-bar:has(#master-toggle:checked) {
+        background: linear-gradient(90deg, rgba(255, 0, 51, 0.12), #0f0f0f 45%);
+      }
+
+      #top-bar h3 {
+        margin: 0;
+        font-size: 17px;
+        font-weight: 700;
+        color: #fff;
+        display: flex;
+        align-items: center;
+        gap: 10px;
+      }
+      /* 模擬 YouTube 播放標誌小膠囊 */
+      #top-bar h3::before {
+        content: "▶";
+        font-size: 10px;
+        width: 24px;
+        height: 17px;
+        border-radius: 5px;
+        background: #3f3f3f;
+        color: #aaa;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        padding-left: 1px;
+        transition: all 0.25s;
+      }
+      #top-bar:has(#master-toggle:checked) h3::before {
+        background: var(--accent-color);
+        color: #fff;
+        box-shadow: 0 0 12px rgba(255, 0, 51, 0.45);
+      }
+
+      #top-bar-controls {
+        display: flex;
+        align-items: center;
+        gap: 10px;
+      }
+
+      #toggle-switch-container {
+        display: flex;
+        align-items: center;
+        gap: 10px;
+        font-size: 12px;
+        font-weight: 500;
+        background: rgba(255, 255, 255, 0.08);
+        padding: 4px 12px;
+        border-radius: 999px;
+      }
+      .status-off {
+        color: #fff;
+      }
+      .status-on {
+        color: var(--text-secondary);
+        opacity: 0.5;
+        transition: all 0.2s;
+      }
+      #top-bar:has(#master-toggle:checked) .status-off {
+        color: var(--text-secondary);
+        opacity: 0.5;
+      }
+      #top-bar:has(#master-toggle:checked) .status-on {
+        color: #fff;
+        opacity: 1;
+        font-weight: 700;
+      }
+
+      .switch {
+        position: relative;
+        display: inline-block;
+        width: 40px;
+        height: 22px;
+      }
+      .switch input {
+        opacity: 0;
+        width: 0;
+        height: 0;
+      }
+      .slider {
+        position: absolute;
+        cursor: pointer;
+        inset: 0;
+        background: #535353;
+        border-radius: 999px;
+        transition: 0.25s;
+      }
+      .slider:before {
+        position: absolute;
+        content: "";
+        height: 16px;
+        width: 16px;
+        left: 3px;
+        top: 3px;
+        background: #e5e5e5;
+        border-radius: 50%;
+        transition: 0.25s;
+      }
+      input:checked + .slider {
+        background: var(--accent-color);
+      }
+      input:checked + .slider:before {
+        transform: translateX(18px);
+        background: #fff;
+      }
+
+      #panel-mode-btn {
+        background: rgba(255, 255, 255, 0.1);
+        color: var(--text-primary);
+        border: none;
+        border-radius: 999px;
+        padding: 6px 14px;
+        font-size: 12px;
+        font-weight: 500;
+        cursor: pointer;
+        transition: background 0.2s;
+        white-space: nowrap;
+      }
+      #panel-mode-btn:hover {
+        background: rgba(255, 255, 255, 0.2);
+      }
+
+      /* --- Layout --- */
+      #main-container {
+        display: flex;
+        flex-grow: 1;
+        overflow: hidden;
+      }
+      .panel {
+        display: flex;
+        flex-direction: column;
+        background: var(--bg-panel);
+      }
+      .panel h3 {
+        margin: 0;
+        padding: 13px 16px;
+        font-size: 12px;
+        font-weight: 600;
+        letter-spacing: 0.8px;
+        text-transform: uppercase;
+        color: var(--text-secondary);
+        border-bottom: 1px solid var(--border-subtle);
+        flex-shrink: 0;
+      }
+
+      #shader-library {
+        width: 288px;
+        border-right: 1px solid var(--border-subtle);
+      }
+      #pipeline-container {
+        flex-grow: 1;
+        min-width: 200px;
+        background: var(--bg-base);
+      }
+      #properties-panel {
+        width: 232px;
+        border-left: 1px solid var(--border-subtle);
+      }
+
+      #library-content,
+      #pipeline-list,
+      #properties-content {
+        padding: 12px;
+        overflow-y: auto;
+        flex-grow: 1;
+      }
+
+      /* --- Library --- */
+      .shader-category > h4 {
+        margin: 2px 0;
+        padding: 8px 10px;
+        border-radius: var(--radius-s);
+        font-size: 13px;
+        font-weight: 600;
+        color: var(--text-primary);
+        cursor: pointer;
+        display: flex;
+        align-items: center;
+      }
+      .shader-category > h4:hover {
+        background: var(--bg-hover);
+      }
+      .shader-category > h4::before {
+        content: "▸";
+        width: 18px;
+        color: var(--text-secondary);
+      }
+
+      .shader-list {
+        list-style: none;
+        padding: 0;
+        margin: 0 0 6px 0;
+      }
+      .shader-list li {
+        padding: 7px 10px 7px 26px;
+        margin-bottom: 2px;
+        border-radius: var(--radius-s);
+        font-size: 13px;
+        color: var(--text-secondary);
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        cursor: pointer;
+        white-space: nowrap;
+        transition:
+          background 0.15s,
+          color 0.15s;
+      }
+      .shader-list li:hover {
+        background: var(--bg-hover);
+        color: #fff;
+      }
+      .shader-name {
+        overflow: hidden;
+        text-overflow: ellipsis;
+        margin-right: 8px;
+      }
+
+      .add-btn {
+        opacity: 0.4;
+        background: rgba(255, 255, 255, 0.12);
+        color: #fff;
+        border: none;
+        width: 22px;
+        height: 22px;
+        border-radius: 999px;
+        cursor: pointer;
+        font-size: 15px;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        flex-shrink: 0;
+        transition: all 0.2s;
+      }
+      .shader-list li:hover .add-btn {
+        opacity: 1;
+        background: #fff;
+        color: #0f0f0f;
+        font-weight: 700;
+      }
+
+      /* --- Pipeline --- */
+      #pipeline-list {
+        margin: 0;
+        padding: 14px;
+        list-style: none;
+        display: flex;
+        flex-direction: column;
+        gap: 8px;
+        counter-reset: stage;
+      }
+      .pipeline-item {
+        counter-increment: stage;
+        background: var(--bg-card);
+        border: 1px solid transparent;
+        padding: 11px 14px;
+        border-radius: var(--radius-s);
+        cursor: grab;
+        display: flex;
+        align-items: center;
+        gap: 10px;
+        transition:
+          background 0.15s,
+          border-color 0.15s;
+      }
+      .pipeline-item::before {
+        content: counter(stage, decimal-leading-zero);
+        font-size: 11px;
+        font-weight: 700;
+        color: var(--text-secondary);
+        background: rgba(255, 255, 255, 0.08);
+        padding: 2px 7px;
+        border-radius: 999px;
+        flex-shrink: 0;
+      }
+      .pipeline-item .shader-name {
+        flex: 1;
+        min-width: 0;
+        font-weight: 500;
+      }
+      .pipeline-item:hover {
+        background: var(--bg-hover);
+      }
+      .pipeline-item.selected {
+        background: var(--accent-soft);
+        border-color: var(--accent-color);
+      }
+      .pipeline-item.selected::before {
+        background: var(--accent-color);
+        color: #fff;
+      }
+
+      .remove-btn {
+        margin-left: auto;
+        flex-shrink: 0;
+        background: transparent;
+        color: var(--text-secondary);
+        border: none;
+        width: 24px;
+        height: 24px;
+        border-radius: 999px;
+        cursor: pointer;
+        font-size: 18px;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+      }
+      .remove-btn:hover {
+        background: rgba(255, 78, 69, 0.2);
+        color: var(--danger-color);
+      }
+
+      /* --- Properties (YouTube Scrubber Sliders) --- */
+      #properties-content {
+        padding: 14px;
+      }
+      .control-group {
+        margin-bottom: 18px;
+      }
+      .control-group label {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        margin-bottom: 10px;
+        font-size: 12px;
+        color: var(--text-secondary);
+        font-weight: 500;
+      }
+      .control-group span {
+        font-family: ui-monospace, Consolas, monospace;
+        color: #fff;
+        background: #272727;
+        padding: 2px 8px;
+        border-radius: 999px;
+        font-size: 11px;
+      }
+
+      input[type="range"] {
+        -webkit-appearance: none;
+        width: 100%;
+        height: 4px;
+        background: #3f3f3f;
+        border-radius: 99px;
+        outline: none;
+      }
+      input[type="range"]::-webkit-slider-thumb {
+        -webkit-appearance: none;
+        width: 14px;
+        height: 14px;
+        border-radius: 50%;
+        background: var(--accent-color);
+        cursor: pointer;
+        transition:
+          transform 0.15s,
+          box-shadow 0.15s;
+      }
+      input[type="range"]::-webkit-slider-thumb:hover {
+        transform: scale(1.2);
+        box-shadow: 0 0 0 6px rgba(255, 0, 51, 0.22);
+      }
+
+      /* Empty states */
+      .empty-hint,
+      #library-content > p {
+        text-align: center;
+        color: var(--text-secondary);
+        font-size: 13px;
+        margin-top: 24px;
+      }
+      .pipeline-empty,
+      #pipeline-list > li:not(.pipeline-item) {
+        text-align: center;
+        color: var(--text-secondary);
+        font-size: 13px;
+        margin-top: 32px;
+        border: 1.5px dashed var(--border-subtle);
+        padding: 24px;
+        border-radius: var(--radius-m);
+      }
+      #placeholder-text {
+        text-align: center;
+        margin-top: 48px;
+        color: var(--text-secondary);
+        opacity: 0.65;
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        gap: 8px;
+      }
+
+      /* --- Side Panel --- */
+      body.side-panel {
+        width: auto;
+        height: 100vh;
+      }
+      body.side-panel #top-bar {
+        height: auto;
+        min-height: 50px;
+        padding: 8px 12px;
+        flex-wrap: wrap;
+        gap: 6px;
+      }
+      body.side-panel #top-bar h3 {
+        font-size: 15px;
+      }
+      body.side-panel #main-container {
+        flex-direction: column;
+        overflow-y: auto;
+      }
+      body.side-panel .panel {
+        width: auto;
+        min-width: 0;
+        border-right: none;
+        border-left: none;
+        border-bottom: 1px solid var(--border-subtle);
+      }
+      body.side-panel #shader-library {
+        flex: 0 0 auto;
+        width: auto;
+      }
+      body.side-panel #library-content {
+        max-height: 220px;
+      }
+      body.side-panel #pipeline-container {
+        flex: 0 0 auto;
+        min-width: 0;
+        width: auto;
+        background: var(--bg-panel);
+      }
+      body.side-panel #pipeline-list {
+        min-height: 80px;
+        padding: 10px;
+      }
+      body.side-panel #properties-panel {
+        flex: 1 1 auto;
+        width: auto;
+        border-bottom: none;
+      }
+      @media (max-width: 330px) {
+        body.side-panel .status-off,
+        body.side-panel .status-on {
+          display: none;
+        }
+        body.side-panel #toggle-switch-container {
+          padding: 3px 6px;
+        }
+      }
+
+      /* --- Tooltip --- */
+      #vsr-tooltip {
+        position: fixed;
+        z-index: 999;
+        max-width: 340px;
+        padding: 10px 13px;
+        background: #212121;
+        border: 1px solid rgba(255, 255, 255, 0.14);
+        border-radius: var(--radius-m);
+        box-shadow: 0 10px 28px rgba(0, 0, 0, 0.7);
+        font-size: 12px;
+        line-height: 1.55;
+        color: var(--text-primary);
+        pointer-events: none;
+      }
+      #vsr-tooltip .vsr-tip-name {
+        font-weight: 600;
+        font-size: 13px;
+        color: #fff;
+        margin-bottom: 2px;
+      }
+      #vsr-tooltip .vsr-tip-meta {
+        color: #ff4e45;
+        font-size: 11px;
+        margin-bottom: 6px;
+      }
+      #vsr-tooltip .vsr-tip-zh {
+        margin-bottom: 4px;
+      }
+      #vsr-tooltip .vsr-tip-en {
+        color: var(--text-secondary);
+        margin-bottom: 4px;
+      }
+      #vsr-tooltip .vsr-tip-path {
+        color: var(--text-secondary);
+        font-family: ui-monospace, Consolas, monospace;
+        font-size: 10px;
+        opacity: 0.75;
+        border-top: 1px solid var(--border-subtle);
+        padding-top: 5px;
+        margin-top: 4px;
+        word-break: break-all;
+      }
+      /* ===== Tooltip 防遮擋智慧定位 ===== */
+      #vsr-tooltip {
+        transition: opacity 0.12s ease;
+      }
+
+      #vsr-tooltip.vsr-smart-pos {
+        left: var(--vsr-tip-left) !important;
+        top: var(--vsr-tip-top) !important;
+        right: auto !important;
+        bottom: auto !important;
+        max-width: min(340px, calc(100vw - 16px)) !important;
+      }
+
+      /* 滑鼠移到 + 或 × 按鈕準備點擊時，自動隱藏提示框 */
+      body:has(.add-btn:hover, .remove-btn:hover) #vsr-tooltip {
+        opacity: 0 !important;
+      }
     </style>
-</head>
-<body>
-
-<div id="top-bar">
-    <h3>YouTube VSR</h3>
-    <div id="top-bar-controls">
+  </head>
+  <body>
+    <div id="top-bar">
+      <h3>YouTube VSR</h3>
+      <div id="top-bar-controls">
         <div id="toggle-switch-container">
-            <span>OFF</span>
-            <label class="switch">
-                <input id="master-toggle" type="checkbox">
-                <span class="slider"></span>
-            </label>
-            <span style="color: var(--accent-color)">ON</span>
+          <span class="status-off">OFF</span>
+          <label class="switch">
+            <input id="master-toggle" type="checkbox" />
+            <span class="slider"></span>
+          </label>
+          <span class="status-on">ON</span>
         </div>
-        <button id="panel-mode-btn" type="button" title="面板位置">📍 側邊欄</button>
+        <button id="panel-mode-btn" type="button" title="面板位置">
+          側邊欄
+        </button>
+      </div>
     </div>
-</div>
 
-<div id="main-container">
-
-    <!-- 左側：已加寬 -->
-    <div class="panel" id="shader-library">
+    <div id="main-container">
+      <div class="panel" id="shader-library">
         <h3>Library</h3>
         <div id="library-content">
-            <p style="text-align: center; color: var(--text-secondary); font-size:13px; margin-top:20px;">
-                (Library Content)
-            </p>
+          <p class="empty-hint">(Library Content)</p>
         </div>
-    </div>
+      </div>
 
-    <!-- 中間：自適應 -->
-    <div class="panel" id="pipeline-container">
+      <div class="panel" id="pipeline-container">
         <h3>Pipeline</h3>
         <ul id="pipeline-list">
-            <li style="text-align: center; color: var(--text-secondary); font-size:13px; margin-top:40px; border: 2px dashed var(--border-subtle); padding: 20px; border-radius: var(--radius-s);">
-                Drag effects here
-            </li>
+          <li class="pipeline-empty">Drag effects here</li>
         </ul>
-    </div>
+      </div>
 
-    <!-- 右側：已稍微縮減 -->
-    <div class="panel" id="properties-panel">
+      <div class="panel" id="properties-panel">
         <h3>Properties</h3>
         <div id="properties-content">
-            <p id="placeholder-text">
-                <span>⚙️</span>
-                Select an effect
-            </p>
+          <p id="placeholder-text">
+            <span>⚙️</span>
+            Select an effect
+          </p>
         </div>
+      </div>
     </div>
-
-</div>
-
-<script src="popup.js"></script>
-</body>
+    <script src="popup.js"></script>
+    <script src="panel-layout.js"></script>
+  </body>
 </html>

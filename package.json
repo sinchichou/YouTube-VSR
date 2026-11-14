@@ -1,7 +1,7 @@
 {
   "name": "youtube-vsr",
-  "version": "1.0.0",
-  "description": "**版本：** 1.0 **作者：** Gemini AI **日期：** 2025年10月29日",
+  "version": "1.0.1",
+  "description": "**版本：** 1.0 **作者：**sinchichou**日期：** 2025年10月29日",
   "main": "index.js",
   "scripts": {
     "postinstall": "node scripts/sync-wgfx.mjs --soft",
