@@ -196,7 +196,16 @@
                 this.device = await adapter.requestDevice({
                     powerPreference: 'high-performance',
                     requiredLimits: {
-                        maxStorageTexturesPerShaderStage: Math.min(8, adapter.limits.maxStorageTexturesPerShaderStage)
+                        maxStorageTexturesPerShaderStage: Math.min(8, adapter.limits.maxStorageTexturesPerShaderStage),
+                        // RAVU R3/R4 的 RGB 變體每個 workgroup 需要 19,264 / 23,424 B
+                        // 的 shared memory，超過 WebGPU 預設的 16,384 B → 不要求這個
+                        // 上限時這兩個效果會在建立 pipeline 時直接失敗。
+                        // 取 adapter 上限（桌面 GPU 通常是 32,768 B）。
+                        maxComputeWorkgroupStorageSize: adapter.limits.maxComputeWorkgroupStorageSize,
+                        // CuNNy / Anime4K / FSRCNNX 等使用 256 threads；要求到 adapter
+                        // 上限可讓日後使用更大 workgroup 的效果也能載入。
+                        maxComputeInvocationsPerWorkgroup: Math.min(
+                            1024, adapter.limits.maxComputeInvocationsPerWorkgroup),
                     }
                 });
 
@@ -520,7 +529,21 @@ fn fs(@builtin(position) fragCoord: vec4f) -> @location(0) vec4f {
             }
             const bytes = await this.loadExtensionBytes(effectPath);
             const pkg = await WGFXPackageClass.fromBytes(bytes);
-            const inst = await pkg.createInstance({ device: this.device, width, height });
+            let inst;
+            try {
+                inst = await pkg.createInstance({ device: this.device, width, height });
+            } catch (e) {
+                // 有些效果(NIS、RAVU-Zoom)在來源 HLSL 刻意不宣告輸出尺寸(支援任意
+                // 倍率),若套件包也沒有宣告,框架無法建立 OUTPUT 紋理 → 直接失敗。
+                // 這裡退回以 2x 輸出(本擴充套件的超解析度倍率)重試一次。
+                const msg = String((e && e.message) || e);
+                if (!/WIDTH\/HEIGHT missing/i.test(msg)) throw e;
+                VSRLogger.warn(`效果 ${pkg.manifest.name} 未宣告輸出尺寸，改以 2x 輸出重試: ${msg}`);
+                inst = await pkg.createInstance({
+                    device: this.device, width, height,
+                    outWidth: width * 2, outHeight: height * 2,
+                });
+            }
             VSRLogger.info(`已載入套件包: ${pkg.manifest.name} (${pkg.manifest.passes.length} passes) @ ${width}x${height}`);
             inst.updateUniforms(params);
             return inst;
